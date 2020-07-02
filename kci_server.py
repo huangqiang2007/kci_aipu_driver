@@ -19,6 +19,7 @@ import struct
 import re
 import fcntl
 import getopt
+from misc import *
 from dbg import *
 
 #
@@ -29,7 +30,12 @@ con = Condition()
 message_queue = queue.Queue(20)
 re_rule = re.compile(r'\{.*?\}+')
 g_server = None
+message_parser = None
 
+class MessageParser:
+	def __init__(self, request):
+		self.request = request
+		LOG_INFO("init MessageParser")
 
 #
 # fetch each message from queue and parse it
@@ -50,13 +56,12 @@ def consume_queue():
         packets_str = q_str["data"]
         #re_match_packets = re.findall('\{.*?\}+', packets_str, re.M|re.I)
         #re_match_packets = re_rule.findall(packets_str)
-    except:
-        LOG_ERR("re.findall() error\npacket_str: {}".format(packets_str))
-        return
-
-    for i in range(len(re_match_packets)):
-        message_dic = json.loads(re_match_packets[i])
-        LOG_DBG("re: {}".format(re_match_packets[i]))
+        LOG_DBG(request)
+        LOG_DBG(packets_str)
+        message_parser.request.sendall(str.encode(json.dumps(packets_str)))
+    except Exception:
+        LOG_ERR("g_server.send: {}".format(packets_str))
+        sys.exit(1)
 
 #
 # one specific thread for consuming message queue
@@ -85,7 +90,7 @@ def get_ip_address(ip_name):
     sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip_addr = socket.inet_ntoa(fcntl.ioctl(sk.fileno(), 0x8915, \
         struct.pack('256s', ip_name[:15]))[20:24])
-    LOG_INFO("get_ip_address " + ip_addr);
+    LOG_INFO("get_ip_address " + ip_addr)
     return ip_addr
 
 def set_TCPserver(server):
@@ -98,7 +103,7 @@ def get_TCPserver():
         return g_server
     else:
         LOG_ERR("get_TCPserver g_server is NULL\n")
-        return Null
+        return None
 
 #
 # a socket server handler class needed by socketserver
@@ -133,67 +138,25 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
             self.request.close()
 
     def setup(self):
-        p_dbg(DBG_ALERT, "connect setup() {}\n".format(self.client_address))
+        global message_parser
+        if (message_parser == None):
+            message_parser = MessageParser(self.request)
+
+        LOG_ALERT("connect setup() {}\n".format(self.client_address))
 
     def finish(self):
         server = get_TCPserver()
         server.close_request(self.request)
-        p_dbg(DBG_ALERT, "connect finish req {}\n".format(self.client_address))
-
-class ParseCmdline:
-    def __init__(self, _argv):
-        self.IP = ''
-        self.VERBOSE = False
-        print(_argv)
-        self.parse_cmdline_args(_argv)
-
-    def help(self):
-        print('help:')
-        print('kci_server.py -p ip, -h]')
-        print(' -p: ip_address')
-        print(' -v: verbose')
-        print('	-h: help')
-        sys.exit(0)
-
-    def parse_cmdline_args(self, _argv):
-        '''
-        parse command line arguments
-        '''
-        try:
-            opts, args = getopt.getopt(_argv, "hp:v:", ["loop=","dbg_lvl="])
-        except getopt.GetoptError:
-            LOG_ERR('kci_server.py cmdline args invalid ' + args)
-            sys.exit(1)
-        print(args)
-        for opt, arg in opts:
-            print(opt)
-            if opt == '-h':
-                self.help()
-            elif opt == '-p':
-                self.IP = arg
-                LOG_DBG("ip: " + self.IP)
-            elif opt == '-v':
-                if arg == 'True':
-                    self.VERBOSE = True
-                elif arg == 'False':
-                    self.VERBOSE = False
-                LOG_DBG("verbose: " + str(self.VERBOSE))
-
-        if self.VERBOSE not in (True, False):
-            LOG_ERR(self.VERBOSE + " is invalid")
-            sys.exit(1)
+        LOG_ALERT("connect finish req {}\n".format(self.client_address))
 
 if __name__ == "__main__":
-    pc_obj = ParseCmdline(sys.argv[1:])
-    if pc_obj.IP == '':
-        print("ip is null")
-        sys.exit(1)
-
+    pc_obj = ParseCmdline()
+    pc_obj.parse_cmdline_server(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
     # ip = get_ip_address(str.encode("lo"))
-    HOST,PORT = pc_obj.IP,9998
-    LOG_ALERT("ip: {}, port: {}\n".format(HOST, PORT))
+    HOST,PORT = pc_obj.IP, pc_obj.PORT
+    LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
     Thread(target = consum_thread, args = (con,)).start()
     server = socketserver.ThreadingTCPServer((HOST, PORT), SockTCPHandler)
     set_TCPserver(server)
