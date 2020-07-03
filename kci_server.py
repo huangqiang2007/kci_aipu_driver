@@ -26,59 +26,60 @@ from dbg import *
 # initial
 #
 j_dic = {}
-con = Condition()
-message_queue = queue.Queue(20)
 re_rule = re.compile(r'\{.*?\}+')
 g_server = None
-message_parser = None
 
+#
+# MessageParser handle each connection from client
+#
 class MessageParser:
-	def __init__(self, request):
-		self.request = request
-		LOG_INFO("init MessageParser")
-
-#
-# fetch each message from queue and parse it
-#
-def consume_queue():
-    global message_parser
-    global message_queue
-    LOG_DBG("consume_queue()\n")
+    def __init__(self, request, client_address):
+        self.request = request
+        self.client_address = client_address
+        self.con = Condition()
+        self.message_queue = queue.Queue(20)
+        LOG_INFO("init MessageParser")
 
     #
-    # the below logic is for handling such case:
-    # more than one message packets are included in single one network packet.
-    # we have to iterate each message packet and parse them.
+    # fetch each message from queue and parse it
     #
-    q_str = message_queue.get()
-    try:
-        request = q_str["request"]
-        packets_str = q_str["data"]
-        #re_match_packets = re.findall('\{.*?\}+', packets_str, re.M|re.I)
-        #re_match_packets = re_rule.findall(packets_str)
-        LOG_DBG(request)
-        LOG_DBG(packets_str)
-        message_parser.request.sendall(str.encode(json.dumps(packets_str)))
-    except Exception:
-        LOG_ERR("g_server.send: {}".format(packets_str))
-        sys.exit(1)
+    def consume_queue(self):
+        LOG_DBG("consume_queue(): {}".format(self.client_address))
+
+        #
+        # the below logic is for handling such case:
+        # more than one message packets are included in single one network packet.
+        # we have to iterate each message packet and parse them.
+        #
+        q_str = self.message_queue.get()
+        try:
+            request_str = q_str["request"]
+            packets_str = q_str["data"]
+            #re_match_packets = re.findall('\{.*?\}+', packets_str, re.M|re.I)
+            #re_match_packets = re_rule.findall(packets_str)
+            LOG_DBG(request_str)
+            LOG_DBG(packets_str)
+            self.request.sendall(str.encode(json.dumps(packets_str)))
+        except Exception:
+            LOG_ERR("g_server.send: {}".format(packets_str))
+            sys.exit(1)
 
 #
 # one specific thread for consuming message queue
-# @con: Condition variable
+# @message_parser: MessageParser object
 #
-def consum_thread(con):
-    LOG_DBG("consum_thread()")
+def consum_thread(message_parser):
+    LOG_DBG("consum_thread(): {}".format(message_parser.client_address))
     while(True):
-        if(message_queue.qsize() == 0):
+        if(message_parser.message_queue.qsize() == 0):
             LOG_INFO( "consumer waiting ...\n")
-            con.acquire()
-            con.wait()
-            con.release()
+            message_parser.con.acquire()
+            message_parser.con.wait()
+            message_parser.con.release()
             LOG_INFO( "consumer run again ...\n")
         else:
             try:
-                consume_queue()
+                message_parser.consume_queue()
             except:
                 LOG_ERR("consume_queue() fail\n")
 
@@ -93,22 +94,11 @@ def get_ip_address(ip_name):
     LOG_INFO("get_ip_address " + ip_addr)
     return ip_addr
 
-def set_TCPserver(server):
-    global g_server
-    g_server = server
-
-def get_TCPserver():
-    global g_server
-    if (g_server):
-        return g_server
-    else:
-        LOG_ERR("get_TCPserver g_server is NULL\n")
-        return None
-
 #
-# a socket server handler class needed by socketserver
+# Socket server handler class needed by socketserver
 #
 class SockTCPHandler(socketserver.BaseRequestHandler):
+    message_parser = None
 
     def handle(self):
         try:
@@ -127,26 +117,28 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
                     LOG_ERR("bytes.decode({}), error\n".format(self.data))
                     continue
 
-                con.acquire()
-                message_queue.put(j_dic)
+                self.message_parser.con.acquire()
+                self.message_parser.message_queue.put(j_dic)
                 LOG_DBG("queue.put {}".format(j_dic["data"]))
-                con.notify()
-                con.release()
+                self.message_parser.con.notify()
+                self.message_parser.con.release()
         except Exception:
             LOG_ERR("{}, {}".format(self.client_address, "exception error"))
         finally:
             self.request.close()
 
     def setup(self):
-        global message_parser
-        if (message_parser == None):
-            message_parser = MessageParser(self.request)
-
+        #
+        # create a new message parser object for a fresh connection
+        # at the same time, a specific thread being created to handle
+        # packets based on this connection.
+        #
+        self.message_parser = MessageParser(self.request, self.client_address)
+        Thread(target = consum_thread, args = (self.message_parser,)).start()
         LOG_ALERT("connect setup() {}\n".format(self.client_address))
 
     def finish(self):
-        server = get_TCPserver()
-        server.close_request(self.request)
+        g_server.close_request(self.request)
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
 
 if __name__ == "__main__":
@@ -154,10 +146,7 @@ if __name__ == "__main__":
     pc_obj.parse_cmdline_server(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
-    # ip = get_ip_address(str.encode("lo"))
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
-    Thread(target = consum_thread, args = (con,)).start()
-    server = socketserver.ThreadingTCPServer((HOST, PORT), SockTCPHandler)
-    set_TCPserver(server)
-    server.serve_forever()
+    g_server = socketserver.ThreadingTCPServer((HOST, PORT), SockTCPHandler)
+    g_server.serve_forever()
