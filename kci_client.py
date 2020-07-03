@@ -17,11 +17,7 @@ import time
 from misc import *
 from dbg import *
 
-j_dic = {}
-
-hum_tem_dic = {}
-
-client = socket.socket()
+g_test = True
 
 def get_ip_address(ip_name):
     sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -31,15 +27,18 @@ def get_ip_address(ip_name):
     return ip_addr
 
 class Test_cls:
-    def __init__(self):
-        pass
+    j_dic = {}
+    hum_tem_dic = {}
+    def __init__(self, ParseCmdline_obj):
+        self.client = socket.socket()
+        self.client.connect((ParseCmdline_obj.IP, ParseCmdline_obj.PORT))
 
     def get_hum_tem(self):
         hid = input("humidify\nid: ")
         hopcode = input("opcode: ")
-        hum_tem_dic["id"] = int(hid)
-        hum_tem_dic["opcode"] = int(hopcode)
-        client.send(str.encode(json.dumps(hum_tem_dic)))
+        self.hum_tem_dic["id"] = int(hid)
+        self.hum_tem_dic["opcode"] = int(hopcode)
+        self.client.send(str.encode(json.dumps(self.hum_tem_dic)))
 
     def recv_thread(self, client):
         LOG_INFO("recv_thread()\n")
@@ -48,7 +47,7 @@ class Test_cls:
             LOG_INFO("\nrcv: " + dic_res.decode() + "\n")
 
     def test(self):
-        rcv_thrd = Thread(target = self.recv_thread, args = (client,))
+        rcv_thrd = Thread(target = self.recv_thread, args = (self.client,))
         rcv_thrd.setDaemon(True)
         rcv_thrd.start()
         while True:
@@ -66,7 +65,25 @@ class Test_cls:
                 LOG_INFO("no item {}\n".format(i_id))
                 break
 
-        client.close()
+        self.client.close()
+
+class MessageSender:
+    def __init__(self, ParseCmdline_obj):
+        try:
+            self.client = socket.socket()
+            self.client.connect((ParseCmdline_obj.IP, ParseCmdline_obj.PORT))
+        except Exception:
+            LOG_ERR("MessageSender connect({}, {}) [fail]".format(ParseCmdline_obj.IP, ParseCmdline_obj.PORT))
+            sys.exit(1)
+
+    def handle_begin_pkt(self):
+        pass
+
+    def handle_end_pkt(self):
+        pass
+
+    def handle_file_pkt(self):
+        pass
 
 if __name__ == "__main__":
     pc_obj = ParseCmdline()
@@ -74,11 +91,13 @@ if __name__ == "__main__":
 
     try:
         HOST,PORT = pc_obj.IP, pc_obj.PORT
-        LOG_ALERT("ip: {}, port: {}\n".format(HOST, PORT))
-        client.connect((pc_obj.IP, 9998))
+        LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
+        if g_test == True:
+            test_obj = Test_cls(pc_obj)
+            test_obj.test()
+        else:
+            message_sender_obj = MessageSender(pc_obj)
     except Exception:
         LOG_ERR("client.connect(({}, {}))".format(pc_obj.IP, pc_obj.PORT))
         sys.exit(1)
 
-    test_obj = Test_cls()
-    test_obj.test()

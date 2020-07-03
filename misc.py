@@ -19,9 +19,10 @@ class ParseCmdline:
     def server_help(self):
         print('help:')
         print('kci_server.py -p ip, -v -h]')
-        print(' -p: ip_address')
+        print(' -i: ip_address')
+        print(' -p: port')
         print(' -v: verbose')
-        print('	-h: help')
+        print(' -h: help')
         sys.exit(0)
 
     def parse_cmdline_server(self, _argv):
