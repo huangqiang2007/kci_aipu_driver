@@ -31,7 +31,107 @@ g_rcv_dic = {}
 g_server = None
 g_result_file = './kci_result.txt'
 
-class ResultData:    
+g_genLiuxImage_obj = None
+
+class GenLiuxImage:
+    image_dir = 'images/'
+    image_abs_path = ''
+    cur_abs_path = ''
+    toolchain_path = ''
+    kernel_path = ''
+    defconfig_abs_path = ''
+    defconfig_list = []
+
+    # record compile log
+    result_fp = None
+
+    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path):
+        global g_result_file
+
+        try:
+            self.result_fp = open(g_result_file, mode='a+')
+        except:
+            LOG_ERR('GenLiuxImage: open: {}'.format(g_result_file))
+            sys.exit(1)
+
+        if os.path.exists(self.image_dir) == True:
+            os.system('rm -fr ' + self.image_dir)
+        os.mkdir(self.image_dir)
+        self.cur_abs_path = os.path.abspath('./')
+        self.image_abs_path = self.cur_abs_path + '/' + self.image_dir
+
+        if os.path.exists(_toolchain_path) == True:
+            self.toolchain_path = _toolchain_path
+
+            # add toolchain path to system 'PATH'
+            env_path = os.getenv('PATH')
+            env_path = self.toolchain_path + ":" + env_path
+            os.environ['PATH'] = env_path
+            # os.system('aarch64-linux-gnu-gcc -v')
+        else:
+            LOG_ERR('GenLiuxImage __init__: _toolchain_path {} invalid'.format(_toolchain_path))
+            sys.exit(1)
+
+        if os.path.exists(_kernel_path) == True:
+            self._kernel_path = os.path.abspath(_kernel_path)
+            LOG_DBG(self._kernel_path)
+        else:
+            LOG_ERR('GenLiuxImage __init__: _kernel_path {} invalid'.format(_kernel_path))
+            sys.exit(1)
+
+        if os.path.exists(_defconfig_path) == True:
+            self.defconfig_abs_path = os.path.abspath(_defconfig_path)
+            LOG_DBG(self.defconfig_abs_path)
+            self.defconfig_list = os.listdir(_defconfig_path)
+            LOG_INFO(self.defconfig_abs_path)
+        else:
+            LOG_ERR('GenLiuxImage __init__: _defconfig_path {} invalid'.format(_defconfig_path))
+            sys.exit(1)
+
+        self.compile_linux()
+
+    def compile_single_linux(self, _defconfig):
+        LOG_DBG('compile_single_linux')
+        # the commands for compiling Linux kernel
+        # CMD1 = 'cd ' + self._kernel_path
+        CMD2 = 'make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean'
+        CMD3 = 'cp ' + _defconfig +  ' ' + self._kernel_path + '/.config'
+        CMD4 = 'make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j4'
+        # CMD5 = 'cd ' + self.cur_abs_path
+
+        cmd_list = [CMD3, CMD4]
+
+        os.chdir(self._kernel_path)
+        for cmd in cmd_list:
+            LOG_ALERT(cmd)
+            ret = os.system(cmd)
+            if ret < 0:
+                LOG_ERR(cmd)
+                return ret
+
+        return 0
+
+    def compile_linux(self):
+        LOG_DBG('compile_linux')
+        for linux_defconfig in self.defconfig_list:
+            os.chdir(self.cur_abs_path)
+            ret = self.compile_single_linux(self.defconfig_abs_path + '/' + linux_defconfig)
+            if ret < 0:
+                LOG_ERR("compile_linux {}".format(linux_defconfig))
+                self.result_fp.write("compile linux: {} [fail]\n".format(linux_defconfig))
+                continue
+            else:
+                self.result_fp.write("compile linux: {} [ok]\n".format(linux_defconfig))
+
+            CMD = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
+                + ' ' + self.image_abs_path + '/' + linux_defconfig + '-Image'
+
+            LOG_INFO(CMD)
+            ret = os.system(CMD)
+            if ret < 0:
+                LOG_ERR(CMD + ' [fail]')
+
+class ResultData:
     result_fp = None
 
     def __init__(self):
@@ -42,7 +142,7 @@ class ResultData:
         except:
             LOG_ERR('ResultData: open: {}'.format(g_result_file))
             sys.exit(1)
-    
+
     def __del__(self):
         if self.result_fp:
             self.result_fp.close()
@@ -203,11 +303,15 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
 
 if __name__ == "__main__":
+    if os.path.exists(g_result_file) == True:
+        os.system('rm -f {}'.format(g_result_file))
+    else:
+        LOG_ERR(g_result_file + ' not exist')
+
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
-    if os.path.exists(g_result_file) == True:
-        os.system('rm -f {}'.format(g_result_file))
+    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path)
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
