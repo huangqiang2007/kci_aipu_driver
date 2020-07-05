@@ -16,8 +16,8 @@ import struct
 import fcntl
 import time
 from kci_packet import *
-from misc import *
-from dbg import *
+from kci_misc import *
+from kci_dbg import *
 
 def get_ip_address(ip_name):
     sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -33,25 +33,25 @@ class MessageSender:
     send_pkt_dic = {}
     recv_pkt_dic = {}
 
-    # def __init__(self, ip, port):
-    #     try:
-    #         self.ms_ip = ip
-    #         self.ms_port = port
-    #         self.client = socket.socket()
-    #         self.client.connect((self.ms_ip, self.ms_port))
-    #     except Exception:
-    #         LOG_ERR("MessageSender connect({}, {}) [fail]".format(ip, port))
-    #         sys.exit(1)
-
-    def __init__(self, ParseCmdline_obj):
+    def __init__(self, ip, port):
         try:
-            self.ms_ip = ParseCmdline_obj.IP
-            self.ms_port = ParseCmdline_obj.PORT
+            self.ms_ip = ip
+            self.ms_port = port
             self.client = socket.socket()
             self.client.connect((self.ms_ip, self.ms_port))
         except Exception:
-            LOG_ERR("MessageSender connect({}, {}) [fail]".format(ParseCmdline_obj.IP, ParseCmdline_obj.PORT))
+            LOG_ERR("MessageSender connect({}, {}) [fail]".format(ip, port))
             sys.exit(1)
+
+    # def __init__(self, ParseCmdline_obj):
+    #     try:
+    #         self.ms_ip = ParseCmdline_obj.IP
+    #         self.ms_port = ParseCmdline_obj.PORT
+    #         self.client = socket.socket()
+    #         self.client.connect((self.ms_ip, self.ms_port))
+    #     except Exception:
+    #         LOG_ERR("MessageSender connect({}, {}) [fail]".format(ParseCmdline_obj.IP, ParseCmdline_obj.PORT))
+    #         sys.exit(1)
 
     def __del__(self):
         try:
@@ -135,15 +135,11 @@ class MessageSender:
                 break
 
 if __name__ == "__main__":
-    pc_obj = ParseCmdline('127.0.0.1', 19998)
-    # pc_obj.parse_cmdline_server(sys.argv[1:])
     try:
-        HOST,PORT = pc_obj.IP, pc_obj.PORT
-        LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
-        message_sender_obj = MessageSender(pc_obj)
-        # message_sender_obj = MessageSender('127.0.0.1', 19998)
+        IP, PORT = '127.0.0.1', 19998
+        LOG_ALERT("ip: {}, port: {}".format(IP, PORT))
+        message_sender_obj = MessageSender(IP, PORT)
         message_sender_obj.test()
     except Exception:
-        LOG_ERR("client.connect(({}, {}))".format(pc_obj.IP, pc_obj.PORT))
+        LOG_ERR("client.connect(({}, {}))".format(IP, PORT))
         sys.exit(1)
-

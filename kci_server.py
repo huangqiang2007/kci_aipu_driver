@@ -19,8 +19,8 @@ import re
 import fcntl
 import getopt
 from kci_packet import *
-from misc import *
-from dbg import *
+from kci_misc import *
+from kci_dbg import *
 
 #
 # initial
@@ -176,7 +176,7 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
 
 if __name__ == "__main__":
-    pc_obj = ParseCmdline('127.0.0.1', 19998)
+    pc_obj = KciParseCmdline('127.0.0.1', 19998)
     # pc_obj.parse_cmdline_server(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 

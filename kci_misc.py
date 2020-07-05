@@ -8,9 +8,9 @@ import struct
 import re
 import fcntl
 import getopt
-from dbg import *
+from kci_dbg import *
 
-class ParseCmdline:
+class KciParseCmdline:
     def __init__(self, ip, port):
         self.IP = ip
         self.PORT = port
