@@ -33,6 +33,16 @@ class MessageSender:
     send_pkt_dic = {}
     recv_pkt_dic = {}
 
+    # def __init__(self, ip, port):
+    #     try:
+    #         self.ms_ip = ip
+    #         self.ms_port = port
+    #         self.client = socket.socket()
+    #         self.client.connect((self.ms_ip, self.ms_port))
+    #     except Exception:
+    #         LOG_ERR("MessageSender connect({}, {}) [fail]".format(ip, port))
+    #         sys.exit(1)
+
     def __init__(self, ParseCmdline_obj):
         try:
             self.ms_ip = ParseCmdline_obj.IP
@@ -125,13 +135,13 @@ class MessageSender:
                 break
 
 if __name__ == "__main__":
-    pc_obj = ParseCmdline()
-    pc_obj.parse_cmdline_server(sys.argv[1:])
-
+    pc_obj = ParseCmdline('127.0.0.1', 19998)
+    # pc_obj.parse_cmdline_server(sys.argv[1:])
     try:
         HOST,PORT = pc_obj.IP, pc_obj.PORT
         LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
         message_sender_obj = MessageSender(pc_obj)
+        # message_sender_obj = MessageSender('127.0.0.1', 19998)
         message_sender_obj.test()
     except Exception:
         LOG_ERR("client.connect(({}, {}))".format(pc_obj.IP, pc_obj.PORT))

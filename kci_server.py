@@ -176,8 +176,8 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
 
 if __name__ == "__main__":
-    pc_obj = ParseCmdline()
-    pc_obj.parse_cmdline_server(sys.argv[1:])
+    pc_obj = ParseCmdline('127.0.0.1', 19998)
+    # pc_obj.parse_cmdline_server(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT

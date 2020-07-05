@@ -11,10 +11,10 @@ import getopt
 from dbg import *
 
 class ParseCmdline:
-    def __init__(self):
-        self.IP = ''
-        self.PORT = 0
-        self.VERBOSE = False
+    def __init__(self, ip, port):
+        self.IP = ip
+        self.PORT = port
+        self.VERBOSE = True
 
     def server_help(self):
         print('help:')
