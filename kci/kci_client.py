@@ -36,6 +36,7 @@ class MessageSender:
     ms_ip = None
     ms_port = 0
     pkt_id = 0
+    image_name = ''
     send_pkt_dic = {}
     recv_pkt_dic = {}
 
@@ -77,6 +78,7 @@ class MessageSender:
 
         rcv_data = self.client.recv(PKT_LEN_1M)
         self.recv_pkt_dic = eval(rcv_data.decode())
+        self.image_name = self.recv_pkt_dic['imageName']
         LOG_INFO("handle_begin_pkt rcv: " + str(self.recv_pkt_dic))
 
     def handle_end_pkt(self):
@@ -85,6 +87,7 @@ class MessageSender:
 
         self.send_pkt_dic['id'] = self.pkt_id
         self.send_pkt_dic['type'] = PT_END
+        self.send_pkt_dic['imageName'] = self.image_name
         self.pkt_id += 1
         self.client.send(str.encode(json.dumps(self.send_pkt_dic)))
 
@@ -104,6 +107,7 @@ class MessageSender:
 
         self.send_pkt_dic['id'] = self.pkt_id
         self.send_pkt_dic['type'] = PT_FILE
+        self.send_pkt_dic['imageName'] = self.image_name
         self.send_pkt_dic['fileName'] = os.path.basename(file_path)
         file_stat = os.stat(file_path)
         self.send_pkt_dic['fileLen'] = file_stat.st_size

@@ -10,6 +10,7 @@
 #
 from threading import Timer, Condition, Thread
 import socketserver
+import os
 import sys
 import queue
 import json
@@ -28,17 +29,40 @@ from kci_dbg import *
 g_rcv_dic = {}
 #re_rule = re.compile(r'\{.*?\}+')
 g_server = None
+g_result_file = './kci_result.txt'
+
+class ResultData:    
+    result_fp = None
+
+    def __init__(self):
+        global g_result_file
+
+        try:
+            self.result_fp = open(g_result_file, mode='a+')
+        except:
+            LOG_ERR('ResultData: open: {}'.format(g_result_file))
+            sys.exit(1)
+    
+    def __del__(self):
+        if self.result_fp:
+            self.result_fp.close()
+
+    def store_data(self, data):
+        self.result_fp.write(data)
+        self.result_fp.flush()
 
 #
 # MessageParser handle each connection from client
 #
 class MessageParser:
+    resultData_obj = None
     send_pkt_dic = {}
     def __init__(self, request, client_address):
         self.request = request
         self.client_address = client_address
         self.con = Condition()
         self.message_queue = queue.Queue(20)
+        self.resultData_obj = ResultData()
         LOG_INFO("init MessageParser")
 
     def common_send(self, send_dic):
@@ -52,12 +76,14 @@ class MessageParser:
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_BEGIN_ACK
         self.send_pkt_dic['imageName'] = 'Image_01'
+        self.resultData_obj.store_data('\n\nImage Begin: ' + self.send_pkt_dic['imageName'] + '\n')
         self.common_send(self.send_pkt_dic)
 
     def handle_end_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_END_ACK
+        # self.resultData_obj.store_data('Image End: ' + rcv_dic['imageName'] + '\n')
         self.common_send(self.send_pkt_dic)
 
     def handle_file_pkt(self, rcv_dic):
@@ -66,6 +92,7 @@ class MessageParser:
         self.send_pkt_dic['type'] = PT_FILE_ACK
         file_data = rcv_dic['fileData']
         LOG_INFO("handle_file_pkt: \n" + file_data)
+        self.resultData_obj.store_data(file_data)
         self.common_send(self.send_pkt_dic)
 
     def handle_rcv_msg(self, rcv_dic):
@@ -178,6 +205,9 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
 if __name__ == "__main__":
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
+
+    if os.path.exists(g_result_file) == True:
+        os.system('rm -f {}'.format(g_result_file))
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
