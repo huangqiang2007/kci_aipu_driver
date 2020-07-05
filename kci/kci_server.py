@@ -123,7 +123,7 @@ class MessageParser:
 def get_ip_address(ip_name):
     sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip_addr = socket.inet_ntoa(fcntl.ioctl(sk.fileno(), 0x8915, \
-        struct.pack('256s', ip_name[:15]))[20:24])
+        struct.pack('256s', ip_name[:15].encode("utf-8")))[20:24])
     LOG_INFO("get_ip_address " + ip_addr)
     return ip_addr
 
@@ -176,8 +176,7 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
 
 if __name__ == "__main__":
-    pc_obj = KciParseCmdline('127.0.0.1', 19998)
-    # pc_obj.parse_cmdline_server(sys.argv[1:])
+    pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT

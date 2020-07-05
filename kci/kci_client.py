@@ -15,14 +15,22 @@ import json
 import struct
 import fcntl
 import time
+print(os.path.abspath(os.curdir))
+sys.path.append(os.path.abspath(os.curdir) + "/kci")
 from kci_packet import *
 from kci_misc import *
 from kci_dbg import *
 
+# ip and port in server side
+IP, PORT = '127.0.0.1', 19998
+
+# socket client object for send back message
+g_message_sender_obj = None
+
 def get_ip_address(ip_name):
     sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip_addr = socket.inet_ntoa(fcntl.ioctl(sk.fileno(), 0x8915, \
-        struct.pack('256s', ip_name[:15]))[20:24])
+        struct.pack('256s', ip_name[:15].encode("utf-8")))[20:24])
     LOG_INFO("ip: {}".format(ip_addr))
     return ip_addr
 
@@ -59,16 +67,6 @@ class MessageSender:
         except Exception:
             LOG_ERR("MessageSender close({}, {}) [fail]".format(self.ms_ip, self.ms_port))
             sys.exit(1)
-
-    def get_hum_tem(self):
-        hum_tem_dic = {}
-        hid = input("humidify\nid: ")
-        hopcode = input("opcode: ")
-        hum_tem_dic["id"] = int(hid)
-        hum_tem_dic["opcode"] = int(hopcode)
-        self.client.send(str.encode(json.dumps(hum_tem_dic)))
-        dic_res = self.client.recv(PKT_LEN_1M)
-        LOG_INFO("rcv: " + dic_res.decode())
 
     def handle_begin_pkt(self):
         self.send_pkt_dic.clear()
@@ -136,10 +134,9 @@ class MessageSender:
 
 if __name__ == "__main__":
     try:
-        IP, PORT = '127.0.0.1', 19998
         LOG_ALERT("ip: {}, port: {}".format(IP, PORT))
-        message_sender_obj = MessageSender(IP, PORT)
-        message_sender_obj.test()
+        g_message_sender_obj = MessageSender(IP, PORT)
+        g_message_sender_obj.test()
     except Exception:
         LOG_ERR("client.connect(({}, {}))".format(IP, PORT))
         sys.exit(1)

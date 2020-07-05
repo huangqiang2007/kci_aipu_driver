@@ -11,10 +11,9 @@ import getopt
 from kci_dbg import *
 
 class KciParseCmdline:
-    def __init__(self, ip, port):
-        self.IP = ip
-        self.PORT = port
-        self.VERBOSE = True
+    IP = ''
+    PORT = 19998
+    VERBOSE = True
 
     def server_help(self):
         print('help:')
@@ -25,7 +24,7 @@ class KciParseCmdline:
         print(' -h: help')
         sys.exit(0)
 
-    def parse_cmdline_server(self, _argv):
+    def __init__(self, _argv):
         '''
         parse command line arguments
         '''
