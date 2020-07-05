@@ -26,6 +26,9 @@ from dbg import *
 from config_case import *
 from set_env import *
 from Test_Logger import logger
+# sys.path.append(os.path.abspath(os.curdir) + "/kci")
+import kci.kci_common
+import kci.kci_client
 
 class ParseBenchmark:
 	'''
@@ -437,7 +440,6 @@ class LoopAllCases:
 			_cmdargs_tuple[5]: report file name, eg: ../report.txt
 		@ _all_cfg_list: the list contains all test configuration
 		'''
-
 		# init loop time
 		loop = 0
 
@@ -494,3 +496,9 @@ class LoopAllCases:
 		logger.end_record()
 		#print(logger)
 		logger.to_txt(_report_file)
+
+		# send back data-packet
+		kci.kci_common.g_message_sender_obj.handle_file_pkt(_report_file)
+
+		# send back end-packet
+		kci.kci_common.g_message_sender_obj.handle_end_pkt()

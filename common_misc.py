@@ -25,6 +25,8 @@ from dbg import *
 from run_case import ParseBenchmark
 from set_env import *
 from Test_Logger import logger
+# sys.path.append(os.path.abspath(os.curdir) + "/kci")
+import kci.kci_common
 from kci.kci_client import *
 
 class ParseCmdline:
@@ -53,7 +55,6 @@ class ParseCmdline:
         '''
         parse command line arguments
         '''
-        global g_message_sender_obj
         PLATFORM = 'juno-linux-4.9'
         ARCH = 'Z1_0701'
         BENCH = ''
@@ -109,8 +110,11 @@ class ParseCmdline:
             dbg_log(EM_ERROR, DBG_LVL + " is invalid")
             sys.exit(1)
 
-        g_message_sender_obj = MessageSender(self.ip, self.port)
-        g_message_sender_obj.test()
+        # setup socket connection
+        kci.kci_common.g_message_sender_obj = MessageSender(self.ip, self.port)
+
+        # send begin-packet to client
+        kci.kci_common.g_message_sender_obj.handle_begin_pkt()
 
         return (PLATFORM, ARCH, BENCH, LOOP, DBG_LVL, REPORT_FILE)
 

@@ -17,15 +17,13 @@ import fcntl
 import time
 print(os.path.abspath(os.curdir))
 sys.path.append(os.path.abspath(os.curdir) + "/kci")
+from kci_common import *
 from kci_packet import *
 from kci_misc import *
 from kci_dbg import *
 
 # ip and port in server side
 IP, PORT = '127.0.0.1', 19998
-
-# socket client object for send back message
-g_message_sender_obj = None
 
 def get_ip_address(ip_name):
     sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

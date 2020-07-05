@@ -320,10 +320,7 @@ multi_process_non_pipeline_dic,
 multi_process_pipeline_dic
 '''
 test_case_config_list = [
-    single_graph_single_frame_dic,
-    single_graph_multi_frame_dic,
-    multi_graph_single_frame_dic,
-    mgmf_m4_f4_dic
+    single_graph_single_frame_dic
 ]
 
 runtime_sanity_test_case_config_list = [
