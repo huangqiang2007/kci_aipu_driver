@@ -19,6 +19,7 @@ import struct
 import re
 import fcntl
 import getopt
+import select
 from kci_packet import *
 from kci_misc import *
 from kci_dbg import *
@@ -160,20 +161,25 @@ class GenLiuxImage:
 #
 class MessageParser:
     resultData_obj = None
+    genLiuxImage_obj = None
     send_pkt_dic = {}
-    def __init__(self, request, client_address, _resultData_obj):
+    def __init__(self, request, client_address, _resultData_obj, _genLiuxImage_obj):
         self.request = request
         self.client_address = client_address
         self.con = Condition()
         self.message_queue = queue.Queue(20)
         self.resultData_obj = _resultData_obj
+        self.genLiuxImage_obj = _genLiuxImage_obj
         LOG_INFO("init MessageParser")
 
     def common_send(self, send_dic):
+        ret = 0
         try:
            self.request.send(str.encode(json.dumps(send_dic)))
         except Exception:
             LOG_ERR('MessageParser common_send id: {}, type: {} [fail]'.format(send_dic['id'], send_dic['type']))
+            ret = -1
+        return ret
 
     def handle_begin_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
@@ -181,23 +187,24 @@ class MessageParser:
         self.send_pkt_dic['type'] = PT_BEGIN_ACK
         self.send_pkt_dic['imageName'] = 'Image_01'
         self.resultData_obj.store_data('\n\nImage Begin: ' + self.send_pkt_dic['imageName'] + '\n')
-        self.common_send(self.send_pkt_dic)
+        return self.common_send(self.send_pkt_dic)
+
 
     def handle_end_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_END_ACK
         # self.resultData_obj.store_data('Image End: ' + rcv_dic['imageName'] + '\n')
-        self.common_send(self.send_pkt_dic)
+        return self.common_send(self.send_pkt_dic)
 
     def handle_file_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_FILE_ACK
         file_data = rcv_dic['fileData']
-        LOG_INFO("handle_file_pkt: \n" + file_data)
+        # LOG_INFO("handle_file_pkt: \n" + file_data)
         self.resultData_obj.store_data(file_data)
-        self.common_send(self.send_pkt_dic)
+        return self.common_send(self.send_pkt_dic)
 
     def handle_rcv_msg(self, rcv_dic):
         pkt_type = rcv_dic['type']
@@ -210,6 +217,58 @@ class MessageParser:
         else:
             LOG_ERR("handle_rcv_msg packet id: {}, type: {} error".format(rcv_dic['id'], rcv_dic['type']))
 
+    def loop_images(self, message_parser):
+        inputs = [self.request]
+        outputs = []
+        rcv_dic = {}
+        connect_lost = False
+
+        TIMEOUT_5MIN = 300
+        TIMEOUT_20MIN = 1200
+        TIMEOUT_1MIN = 60
+        timeout = TIMEOUT_1MIN
+
+        while True:
+            LOG_ALERT('before select')
+            try:
+                readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
+            except:
+                LOG_ERR('loop_images select: timeout')
+                continue
+
+            for s in readable:
+                data = s.recv(PKT_LEN_1M)
+                if (not data):
+                    # LOG_ERR("connection lost")
+                    connect_lost = True
+                    break
+                rcv_dic = eval(bytes.decode(data))
+                LOG_ALERT(rcv_dic)
+                pkt_type = rcv_dic['type']
+                if pkt_type == PT_BEGIN:
+                    if self.handle_begin_pkt(rcv_dic) < 0:
+                        connect_lost = True
+                        break
+                    else:
+                        timeout = TIMEOUT_20MIN
+                elif pkt_type == PT_FILE:
+                    if self.handle_file_pkt(rcv_dic) < 0:
+                        connect_lost = True
+                        break
+                    else:
+                        timeout = TIMEOUT_1MIN
+                elif pkt_type == PT_END:
+                    if self.handle_end_pkt(rcv_dic) < 0:
+                        connect_lost = True
+                        break
+                    else:
+                        timeout = TIMEOUT_5MIN
+                else:
+                    LOG_ERR("loop_images packet id: {}, type: {} error".format(rcv_dic['id'], rcv_dic['type']))
+
+            if connect_lost == True:
+                LOG_ALERT('loop_images exit')
+                break
     #
     # fetch each message from queue and parse it
     #
@@ -267,26 +326,27 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
             while (True):
-                self.data = self.request.recv(PKT_LEN_1M)
-                LOG_INFO( "{} send: {}".format(self.client_address, self.data))
-                if (not self.data):
-                    LOG_ERR("connection lost")
-                    break
+                pass
+                # self.data = self.request.recv(PKT_LEN_1M)
+                # LOG_INFO( "{} send: {}".format(self.client_address, self.data))
+                # if (not self.data):
+                #     LOG_ERR("connection lost")
+                #     break
 
-                try:
-                    rcv_data = bytes.decode(self.data)
-                    g_rcv_dic["request"] = self.request
-                    g_rcv_dic["data"] = rcv_data
-                except:
-                    LOG_ERR("bytes.decode({}), error\n".format(self.data))
-                    continue
+                # try:
+                #     rcv_data = bytes.decode(self.data)
+                #     g_rcv_dic["request"] = self.request
+                #     g_rcv_dic["data"] = rcv_data
+                # except:
+                #     LOG_ERR("bytes.decode({}), error\n".format(self.data))
+                #     continue
 
-                # put one packet to message queue
-                self.message_parser.con.acquire()
-                self.message_parser.message_queue.put(g_rcv_dic)
-                # LOG_DBG("queue.put {}".format(g_rcv_dic["data"]))
-                self.message_parser.con.notify()
-                self.message_parser.con.release()
+                # # put one packet to message queue
+                # self.message_parser.con.acquire()
+                # self.message_parser.message_queue.put(g_rcv_dic)
+                # # LOG_DBG("queue.put {}".format(g_rcv_dic["data"]))
+                # self.message_parser.con.notify()
+                # self.message_parser.con.release()
         except Exception:
             LOG_ERR("handle exception {}\n".format(self.client_address))
         finally:
@@ -294,13 +354,16 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
 
     def setup(self):
         global g_ResultData_obj
+        global g_genLiuxImage_obj
         #
         # create a new message parser object for a fresh connection
         # at the same time, a specific thread being created to handle
         # packets based on this connection.
         #
-        self.message_parser = MessageParser(self.request, self.client_address, g_ResultData_obj)
-        Thread(target = self.message_parser.consum_thread, args = (self.message_parser,)).start()
+        self.message_parser = MessageParser(self.request, self.client_address, g_ResultData_obj, g_genLiuxImage_obj)
+        # Thread(target = self.message_parser.consum_thread, args = (self.message_parser,)).start()
+
+        Thread(target = self.message_parser.loop_images, args = (self.message_parser,)).start()
         LOG_ALERT("connect setup() {}\n".format(self.client_address))
 
     def finish(self):
@@ -317,7 +380,7 @@ if __name__ == "__main__":
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
-    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path, g_ResultData_obj)
+    # g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path, g_ResultData_obj)
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
