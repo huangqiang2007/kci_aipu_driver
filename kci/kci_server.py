@@ -257,57 +257,60 @@ class MessageParser:
         rcv_dic = {}
         connect_lost = False
 
-        TIMEOUT_5MIN = 300
-        TIMEOUT_20MIN = 1200
         TIMEOUT_1MIN = 60
+        TIMEOUT_20MIN = 1200
         timeout = TIMEOUT_1MIN
 
         while True:
-            LOG_ALERT('before select')
+            LOG_ALERT('before select, timeout {}, {}'.format(timeout, connect_lost))
             try:
                 readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
             except:
-                LOG_ERR('loop_images select: timeout')
+                LOG_ERR('\n\nloop_images select: timeout')
                 connect_lost = True
 
-            for s in readable:
-                data = s.recv(PKT_LEN_1M)
-                if (not data):
-                    # LOG_ERR("connection lost")
-                    connect_lost = True
-                    break
-                rcv_dic = eval(bytes.decode(data))
-                LOG_ALERT(rcv_dic)
-                pkt_type = rcv_dic['type']
-                if pkt_type == PT_BEGIN:
-                    if self.handle_begin_pkt(rcv_dic) < 0:
+            if len(readable) == 0:
+                LOG_ERR('loop_images select: timeout')
+                connect_lost = True
+            else:
+                for s in readable:
+                    data = s.recv(PKT_LEN_1M)
+                    if (not data):
+                        # LOG_ERR("connection lost")
                         connect_lost = True
-                        prompt = 'loop_images handle_begin_pkt [fail]'
-                        self.resultData_obj.store_data(prompt + '\n')
-                        LOG_ERR(prompt)
                         break
+                    rcv_dic = eval(bytes.decode(data))
+                    LOG_ALERT(rcv_dic)
+                    pkt_type = rcv_dic['type']
+                    if pkt_type == PT_BEGIN:
+                        if self.handle_begin_pkt(rcv_dic) < 0:
+                            connect_lost = True
+                            prompt = 'loop_images handle_begin_pkt [fail]'
+                            self.resultData_obj.store_data(prompt + '\n')
+                            LOG_ERR(prompt)
+                            break
+                        else:
+                            timeout = TIMEOUT_20MIN
+                    elif pkt_type == PT_FILE:
+                        if self.handle_file_pkt(rcv_dic) < 0:
+                            connect_lost = True
+                            prompt = 'loop_images handle_file_pkt [fail]'
+                            self.resultData_obj.store_data(prompt + '\n')
+                            LOG_ERR(prompt)
+                            break
+                        else:
+                            timeout = TIMEOUT_1MIN
+                    elif pkt_type == PT_END:
+                        if self.handle_end_pkt(rcv_dic) < 0:
+                            connect_lost = True
+                            prompt = 'loop_images handle_end_pkt [fail]'
+                            self.resultData_obj.store_data(prompt + '\n')
+                            LOG_ERR(prompt)
+                            break
+                        else:
+                            timeout = TIMEOUT_1MIN
                     else:
-                        timeout = TIMEOUT_20MIN
-                elif pkt_type == PT_FILE:
-                    if self.handle_file_pkt(rcv_dic) < 0:
-                        connect_lost = True
-                        prompt = 'loop_images handle_file_pkt [fail]'
-                        self.resultData_obj.store_data(prompt + '\n')
-                        LOG_ERR(prompt)
-                        break
-                    else:
-                        timeout = TIMEOUT_1MIN
-                elif pkt_type == PT_END:
-                    if self.handle_end_pkt(rcv_dic) < 0:
-                        connect_lost = True
-                        prompt = 'loop_images handle_end_pkt [fail]'
-                        self.resultData_obj.store_data(prompt + '\n')
-                        LOG_ERR(prompt)
-                        break
-                    else:
-                        timeout = TIMEOUT_5MIN
-                else:
-                    LOG_ERR("loop_images packet id: {}, type: {} error".format(rcv_dic['id'], rcv_dic['type']))
+                        LOG_ERR("loop_images packet id: {}, type: {} error".format(rcv_dic['id'], rcv_dic['type']))
 
             if connect_lost == True:
                 LOG_ALERT('loop_images exit')
