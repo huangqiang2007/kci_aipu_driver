@@ -73,15 +73,21 @@ class GenLiuxImage:
     defconfig_list = []
     image_list = []
 
+    # flag: control whether it needs to compile Linux kernel
+    compileLinux = False
+
     # record compile log
     resultData_obj = None
 
-    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _resultData_obj):
+    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _compileLinux, _resultData_obj):
+        self.compileLinux = _compileLinux
         self.resultData_obj = _resultData_obj
 
-        if os.path.exists(self.image_dir) == True:
-            os.system('rm -fr ' + self.image_dir)
-        os.mkdir(self.image_dir)
+        # if os.path.exists(self.image_dir) == True:
+        #     os.system('rm -fr ' + self.image_dir)
+        if os.path.exists(self.image_dir) == False:
+            os.mkdir(self.image_dir)
+
         self.cur_abs_path = os.path.abspath('./')
         self.image_abs_path = self.cur_abs_path + '/' + self.image_dir
 
@@ -138,32 +144,35 @@ class GenLiuxImage:
 
     def compile_linux(self):
         LOG_DBG('compile_linux')
-        for linux_defconfig in self.defconfig_list:
-            os.chdir(self.cur_abs_path)
-            ret = self.compile_single_linux(self.defconfig_abs_path + '/' + linux_defconfig)
-            if ret < 0:
-                LOG_ERR("compile_linux {}".format(linux_defconfig))
-                self.resultData_obj.store_data("compile linux: {} [fail]\n".format(linux_defconfig))
-                continue
-            else:
-                self.resultData_obj.store_data("compile linux: {} [ok]\n".format(linux_defconfig))
 
-            CMD = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
-                + ' ' + self.image_abs_path + '/' + linux_defconfig + '-Image'
+        # whether compile Linux kernel firstly
+        if self.compileLinux == True:
+            for linux_defconfig in self.defconfig_list:
+                os.chdir(self.cur_abs_path)
+                ret = self.compile_single_linux(self.defconfig_abs_path + '/' + linux_defconfig)
+                if ret < 0:
+                    LOG_ERR("compile_linux {}".format(linux_defconfig))
+                    self.resultData_obj.store_data("compile linux: {} [fail]\n".format(linux_defconfig))
+                    continue
+                else:
+                    self.resultData_obj.store_data("compile linux: {} [ok]\n".format(linux_defconfig))
 
-            LOG_INFO(CMD)
-            ret = os.system(CMD)
-            if ret < 0:
-                LOG_ERR(CMD + ' [fail]')
+                CMD = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
+                    + ' ' + self.image_abs_path + '/' + linux_defconfig + '-Image'
 
-        # store all images to specific List
+                LOG_INFO(CMD)
+                ret = os.system(CMD)
+                if ret < 0:
+                    LOG_ERR(CMD + ' [fail]')
+
+        # extract all images to form specific List
         self.image_list = os.listdir(self.image_abs_path)
         LOG_ALERT(self.image_list)
 
     def tftp_loop_one_image(self):
         os.chdir(self.cur_abs_path)
-        LOG_DBG('tftp_loop_one_image cur_path: ' + os.path.abspath(self.tftp_dir))
-        LOG_INFO('TFTP-idx: {}, len(image_list): {}'.format(self.tftp_idx, len(self.image_list)))
+        LOG_INFO('tftp_loop_one_image cur_path: ' + os.path.abspath(self.tftp_dir))
+        LOG_INFO('tftp_loop_one_image: TFTP-idx: {}, len(image_list): {}'.format(self.tftp_idx, len(self.image_list)))
         if self.tftp_idx >= len(self.image_list):
             LOG_ALERT('tftp_loop_one_image loop end')
             self.tftp_cur_image_name = ''
@@ -175,7 +184,7 @@ class GenLiuxImage:
                 + ' ' + os.path.abspath(self.tftp_dir) + '/Image'
 
             self.tftp_idx += 1
-            LOG_DBG(CMD)
+            LOG_INFO('tftp_loop_one_image: ' + CMD)
             if os.system(CMD) < 0:
                 LOG_ERR(CMD + ' [fail]')
                 continue
@@ -222,7 +231,6 @@ class MessageParser:
         self.send_pkt_dic['imageName'] = self.genLiuxImage_obj.tftp_cur_image_name
         self.resultData_obj.store_data('\n\nImage Begin: ' + self.send_pkt_dic['imageName'] + '\n')
         return self.common_send(self.send_pkt_dic)
-
 
     def handle_end_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
@@ -439,7 +447,8 @@ if __name__ == "__main__":
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
-    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path, g_ResultData_obj)
+    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, \
+        pc_obj.defconfig_path, pc_obj.compileLinux, g_ResultData_obj)
     g_genLiuxImage_obj.tftp_loop_one_image()
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT

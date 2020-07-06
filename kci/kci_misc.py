@@ -16,6 +16,7 @@ class KciParseCmdline:
     toolchain_path = ''
     kernel_path = ''
     defconfig_path = ''
+    compileLinux = False
     VERBOSE = True
 
     def server_help(self):
@@ -35,7 +36,7 @@ class KciParseCmdline:
         parse command line arguments
         '''
         try:
-            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:v", ["loop=","dbg_lvl="])
+            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:cv", ["loop=","dbg_lvl="])
         except getopt.GetoptError:
             LOG_ERR('kci_server.py cmdline args invalid ' + args)
             sys.exit(1)
@@ -57,6 +58,9 @@ class KciParseCmdline:
                 LOG_DBG("Linux kernel path: " + self.kernel_path)
             elif opt == '-f':
                 self.defconfig_path = arg
+                LOG_DBG("Linux defconfig path: " + self.defconfig_path)
+            elif opt == '-c':
+                self.compileLinux = True
                 LOG_DBG("Linux defconfig path: " + self.defconfig_path)
             elif opt == '-v':
                 self.VERBOSE = True
