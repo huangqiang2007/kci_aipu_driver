@@ -41,6 +41,7 @@ class GenLiuxImage:
     kernel_path = ''
     defconfig_abs_path = ''
     defconfig_list = []
+    image_list = []
 
     # record compile log
     result_fp = None
@@ -103,7 +104,7 @@ class GenLiuxImage:
 
         os.chdir(self._kernel_path)
         for cmd in cmd_list:
-            LOG_ALERT(cmd)
+            LOG_DBG(cmd)
             ret = os.system(cmd)
             if ret < 0:
                 LOG_ERR(cmd)
@@ -130,6 +131,10 @@ class GenLiuxImage:
             ret = os.system(CMD)
             if ret < 0:
                 LOG_ERR(CMD + ' [fail]')
+
+        # store all images to specific List
+        self.image_list = os.listdir(self.image_abs_path)
+        LOG_ALERT(self.image_list)
 
 class ResultData:
     result_fp = None
@@ -305,8 +310,7 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
 if __name__ == "__main__":
     if os.path.exists(g_result_file) == True:
         os.system('rm -f {}'.format(g_result_file))
-    else:
-        LOG_ERR(g_result_file + ' not exist')
+        LOG_ALERT('rm -f {}'.format(g_result_file))
 
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)

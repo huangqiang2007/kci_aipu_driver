@@ -20,10 +20,11 @@ class KciParseCmdline:
 
     def server_help(self):
         print('help:')
-        print('kci_server.py -i ip -p port -v -h]')
+        print('kci_server.py -i ip -p port -t toolchain_path -k kernel_path -f defconfig_path -v -h]')
         print(' -i: ip_address')
         print(' -p: port')
         print(' -t: toolchain path')
+        print(' -k: Linux kernel path')
         print(' -f: Linux defconfig path')
         print(' -v: verbose')
         print(' -h: help')
