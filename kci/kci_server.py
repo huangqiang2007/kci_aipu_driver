@@ -20,6 +20,7 @@ import re
 import fcntl
 import getopt
 import select
+import time
 from kci_packet import *
 from kci_misc import *
 from kci_dbg import *
@@ -60,7 +61,10 @@ class ResultData:
             LOG_ERR('store_data')
 
 class GenLiuxImage:
+    tftp_dir = './tftp_root'
+    tftp_idx = 0
     image_dir = 'images/'
+    tftp_cur_image_name = ''
     image_abs_path = ''
     cur_abs_path = ''
     toolchain_path = ''
@@ -156,6 +160,36 @@ class GenLiuxImage:
         self.image_list = os.listdir(self.image_abs_path)
         LOG_ALERT(self.image_list)
 
+    def tftp_loop_one_image(self):
+        os.chdir(self.cur_abs_path)
+        LOG_DBG('tftp_loop_one_image cur_path: ' + os.path.abspath(self.tftp_dir))
+        LOG_DBG('TFTP-idx: {}, len(image_list): {}'.format(self.tftp_idx, len(self.image_list)))
+        if self.tftp_idx >= len(self.image_list):
+            LOG_ALERT('tftp_loop_one_image loop end')
+            self.tftp_cur_image_name = ''
+            sys.exit(0)
+
+        while self.tftp_idx < len(self.image_list):
+            self.tftp_cur_image_name = self.image_list[self.tftp_idx]
+            CMD = 'cp ' + self.image_abs_path + '/' +  self.tftp_cur_image_name \
+                + ' ' + os.path.abspath(self.tftp_dir) + '/Image'
+
+            self.tftp_idx += 1
+            LOG_DBG(CMD)
+            if os.system(CMD) < 0:
+                LOG_ERR(CMD + ' [fail]')
+                continue
+            else:
+                break
+                # Todo... relay switch control
+
+        # return current test image name
+        prompt = 'TFTP Image name: {}'.format(self.tftp_cur_image_name)
+        # self.resultData_obj.store_data(prompt + '\n')
+        LOG_ALERT(prompt)
+        return self.tftp_cur_image_name
+
+
 #
 # MessageParser handle each connection from client
 #
@@ -185,7 +219,7 @@ class MessageParser:
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_BEGIN_ACK
-        self.send_pkt_dic['imageName'] = 'Image_01'
+        self.send_pkt_dic['imageName'] = self.genLiuxImage_obj.tftp_cur_image_name
         self.resultData_obj.store_data('\n\nImage Begin: ' + self.send_pkt_dic['imageName'] + '\n')
         return self.common_send(self.send_pkt_dic)
 
@@ -234,7 +268,7 @@ class MessageParser:
                 readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
             except:
                 LOG_ERR('loop_images select: timeout')
-                continue
+                connect_lost = True
 
             for s in readable:
                 data = s.recv(PKT_LEN_1M)
@@ -248,18 +282,27 @@ class MessageParser:
                 if pkt_type == PT_BEGIN:
                     if self.handle_begin_pkt(rcv_dic) < 0:
                         connect_lost = True
+                        prompt = 'loop_images handle_begin_pkt [fail]'
+                        self.resultData_obj.store_data(prompt + '\n')
+                        LOG_ERR(prompt)
                         break
                     else:
                         timeout = TIMEOUT_20MIN
                 elif pkt_type == PT_FILE:
                     if self.handle_file_pkt(rcv_dic) < 0:
                         connect_lost = True
+                        prompt = 'loop_images handle_file_pkt [fail]'
+                        self.resultData_obj.store_data(prompt + '\n')
+                        LOG_ERR(prompt)
                         break
                     else:
                         timeout = TIMEOUT_1MIN
                 elif pkt_type == PT_END:
                     if self.handle_end_pkt(rcv_dic) < 0:
                         connect_lost = True
+                        prompt = 'loop_images handle_end_pkt [fail]'
+                        self.resultData_obj.store_data(prompt + '\n')
+                        LOG_ERR(prompt)
                         break
                     else:
                         timeout = TIMEOUT_5MIN
@@ -268,7 +311,10 @@ class MessageParser:
 
             if connect_lost == True:
                 LOG_ALERT('loop_images exit')
+                self.request.close()
+                self.genLiuxImage_obj.tftp_loop_one_image()
                 break
+
     #
     # fetch each message from queue and parse it
     #
@@ -326,7 +372,10 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
             while (True):
-                pass
+                if self.message_parser.genLiuxImage_obj.tftp_cur_image_name == '':
+                    break
+
+                time.sleep(10)
                 # self.data = self.request.recv(PKT_LEN_1M)
                 # LOG_INFO( "{} send: {}".format(self.client_address, self.data))
                 # if (not self.data):
@@ -380,7 +429,8 @@ if __name__ == "__main__":
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
-    # g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path, g_ResultData_obj)
+    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path, g_ResultData_obj)
+    g_genLiuxImage_obj.tftp_loop_one_image()
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
