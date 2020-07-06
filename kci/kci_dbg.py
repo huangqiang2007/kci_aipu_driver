@@ -18,6 +18,7 @@ DBG_ERROR = 0
 DBG_ALERT = 1
 DBG_INFO  = 2
 DBG_DEBUG = 3
+g_debug_level = DBG_INFO
 
 #
 # when it reboots system successfully, the log file will be
@@ -48,7 +49,9 @@ def p_dbg_init(verbose):
 def p_dbg(dbglevel, text):
     global g_file
     global g_verbose
-    if (dbglevel <= DBG_DEBUG):
+    global g_debug_level
+
+    if (dbglevel <= g_debug_level):
         if (dbglevel == DBG_ERROR):
             if (g_verbose == True):
                 print("[error] {}".format(text))

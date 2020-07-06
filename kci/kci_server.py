@@ -163,7 +163,7 @@ class GenLiuxImage:
     def tftp_loop_one_image(self):
         os.chdir(self.cur_abs_path)
         LOG_DBG('tftp_loop_one_image cur_path: ' + os.path.abspath(self.tftp_dir))
-        LOG_DBG('TFTP-idx: {}, len(image_list): {}'.format(self.tftp_idx, len(self.image_list)))
+        LOG_INFO('TFTP-idx: {}, len(image_list): {}'.format(self.tftp_idx, len(self.image_list)))
         if self.tftp_idx >= len(self.image_list):
             LOG_ALERT('tftp_loop_one_image loop end')
             self.tftp_cur_image_name = ''
@@ -261,6 +261,11 @@ class MessageParser:
         TIMEOUT_20MIN = 1200
         timeout = TIMEOUT_1MIN
 
+        # if it has looped all Images, don't loop again
+        if self.genLiuxImage_obj.tftp_cur_image_name == '':
+            LOG_ALERT('loop_images done')
+            sys.exit(0)
+
         while True:
             LOG_ALERT('before select, timeout {}, {}'.format(timeout, connect_lost))
             try:
@@ -280,7 +285,7 @@ class MessageParser:
                         connect_lost = True
                         break
                     rcv_dic = eval(bytes.decode(data))
-                    LOG_ALERT(rcv_dic)
+                    LOG_DBG(rcv_dic)
                     pkt_type = rcv_dic['type']
                     if pkt_type == PT_BEGIN:
                         if self.handle_begin_pkt(rcv_dic) < 0:
@@ -315,7 +320,8 @@ class MessageParser:
             if connect_lost == True:
                 LOG_ALERT('loop_images exit')
                 self.request.close()
-                self.genLiuxImage_obj.tftp_loop_one_image()
+                # self.genLiuxImage_obj.tftp_loop_one_image()
+                self.genLiuxImage_obj.tftp_cur_image_name = ''
                 break
 
     #
@@ -378,7 +384,7 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
                 if self.message_parser.genLiuxImage_obj.tftp_cur_image_name == '':
                     break
 
-                time.sleep(10)
+                # time.sleep(10)
                 # self.data = self.request.recv(PKT_LEN_1M)
                 # LOG_INFO( "{} send: {}".format(self.client_address, self.data))
                 # if (not self.data):
@@ -407,6 +413,8 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
     def setup(self):
         global g_ResultData_obj
         global g_genLiuxImage_obj
+
+        LOG_ALERT("connect setup() {}\n".format(self.client_address))
         #
         # create a new message parser object for a fresh connection
         # at the same time, a specific thread being created to handle
@@ -414,13 +422,12 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         #
         self.message_parser = MessageParser(self.request, self.client_address, g_ResultData_obj, g_genLiuxImage_obj)
         # Thread(target = self.message_parser.consum_thread, args = (self.message_parser,)).start()
-
         Thread(target = self.message_parser.loop_images, args = (self.message_parser,)).start()
-        LOG_ALERT("connect setup() {}\n".format(self.client_address))
 
     def finish(self):
-        g_server.close_request(self.request)
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
+        g_server.close_request(self.request)
+        self.message_parser.genLiuxImage_obj.tftp_loop_one_image()
 
 if __name__ == "__main__":
     if os.path.exists(g_result_file) == True:
