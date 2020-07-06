@@ -30,8 +30,33 @@ g_rcv_dic = {}
 #re_rule = re.compile(r'\{.*?\}+')
 g_server = None
 g_result_file = './kci_result.txt'
-
+g_ResultData_obj = None
 g_genLiuxImage_obj = None
+
+
+class ResultData:
+    result_fp = None
+
+    def __init__(self):
+        global g_result_file
+
+        try:
+            self.result_fp = open(g_result_file, mode='a+')
+            LOG_ALERT('ResultData: open: {}'.format(g_result_file))
+        except:
+            LOG_ERR('ResultData: open: {}'.format(g_result_file))
+            sys.exit(1)
+
+    def __del__(self):
+        if self.result_fp:
+            self.result_fp.close()
+
+    def store_data(self, data):
+        try:
+            self.result_fp.write(data)
+            self.result_fp.flush()
+        except:
+            LOG_ERR('store_data')
 
 class GenLiuxImage:
     image_dir = 'images/'
@@ -44,16 +69,10 @@ class GenLiuxImage:
     image_list = []
 
     # record compile log
-    result_fp = None
+    resultData_obj = None
 
-    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path):
-        global g_result_file
-
-        try:
-            self.result_fp = open(g_result_file, mode='a+')
-        except:
-            LOG_ERR('GenLiuxImage: open: {}'.format(g_result_file))
-            sys.exit(1)
+    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _resultData_obj):
+        self.resultData_obj = _resultData_obj
 
         if os.path.exists(self.image_dir) == True:
             os.system('rm -fr ' + self.image_dir)
@@ -119,10 +138,10 @@ class GenLiuxImage:
             ret = self.compile_single_linux(self.defconfig_abs_path + '/' + linux_defconfig)
             if ret < 0:
                 LOG_ERR("compile_linux {}".format(linux_defconfig))
-                self.result_fp.write("compile linux: {} [fail]\n".format(linux_defconfig))
+                self.resultData_obj.store_data("compile linux: {} [fail]\n".format(linux_defconfig))
                 continue
             else:
-                self.result_fp.write("compile linux: {} [ok]\n".format(linux_defconfig))
+                self.resultData_obj.store_data("compile linux: {} [ok]\n".format(linux_defconfig))
 
             CMD = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
                 + ' ' + self.image_abs_path + '/' + linux_defconfig + '-Image'
@@ -136,38 +155,18 @@ class GenLiuxImage:
         self.image_list = os.listdir(self.image_abs_path)
         LOG_ALERT(self.image_list)
 
-class ResultData:
-    result_fp = None
-
-    def __init__(self):
-        global g_result_file
-
-        try:
-            self.result_fp = open(g_result_file, mode='a+')
-        except:
-            LOG_ERR('ResultData: open: {}'.format(g_result_file))
-            sys.exit(1)
-
-    def __del__(self):
-        if self.result_fp:
-            self.result_fp.close()
-
-    def store_data(self, data):
-        self.result_fp.write(data)
-        self.result_fp.flush()
-
 #
 # MessageParser handle each connection from client
 #
 class MessageParser:
     resultData_obj = None
     send_pkt_dic = {}
-    def __init__(self, request, client_address):
+    def __init__(self, request, client_address, _resultData_obj):
         self.request = request
         self.client_address = client_address
         self.con = Condition()
         self.message_queue = queue.Queue(20)
-        self.resultData_obj = ResultData()
+        self.resultData_obj = _resultData_obj
         LOG_INFO("init MessageParser")
 
     def common_send(self, send_dic):
@@ -294,12 +293,13 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
             self.request.close()
 
     def setup(self):
+        global g_ResultData_obj
         #
         # create a new message parser object for a fresh connection
         # at the same time, a specific thread being created to handle
         # packets based on this connection.
         #
-        self.message_parser = MessageParser(self.request, self.client_address)
+        self.message_parser = MessageParser(self.request, self.client_address, g_ResultData_obj)
         Thread(target = self.message_parser.consum_thread, args = (self.message_parser,)).start()
         LOG_ALERT("connect setup() {}\n".format(self.client_address))
 
@@ -312,10 +312,12 @@ if __name__ == "__main__":
         os.system('rm -f {}'.format(g_result_file))
         LOG_ALERT('rm -f {}'.format(g_result_file))
 
+    g_ResultData_obj = ResultData()
+
     pc_obj = KciParseCmdline(sys.argv[1:])
     p_dbg_init(pc_obj.VERBOSE)
 
-    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path)
+    g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, pc_obj.defconfig_path, g_ResultData_obj)
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
