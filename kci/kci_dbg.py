@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
+
+#-------------------------------------------------------------------------------
+# This file is CONFIDENTIAL and any use by you is subject to the terms of the
+# agreement between you and Arm China or the terms of the agreement between you
+# and the party authorised by Arm China to disclose this file to you.
+# The confidential and proprietary information contained in this file may only
+# be used by a person authorised under and to the extent permitted by a
+# subsisting licensing agreement from Arm China.
 #
-# File name: dbg.py
-# Author: huangq@moxigroup.com
+#        (C) Copyright 2020 Arm Technology (China) Co. Ltd.
+#                    All rights reserved.
+#
+# This entire notice must be reproduced on all copies of this file and copies of
+# this file may only be made by a person if such person is permitted to do so
+# under the terms of a subsisting license agreement from Arm China.
+#
+#--------------------------------------------------------------------------------
 #
 # Note: this file is the main logic for debugging.
 #
-#
-#
-#
-
+import sys
 import time
 
 #
@@ -24,27 +35,30 @@ g_debug_level = DBG_INFO
 # when it reboots system successfully, the log file will be
 # rewriten.
 #
-file_name = "/tmp/energyroom.log"
+file_name = "./kci_test.log"
 
 g_file = None
 
 #
 # True: directly output to terminal
-# False: backup log to a  file
+# False: backup log to a file
 #
 g_verbose = True
 
 def p_dbg_init(verbose):
-	global g_file
-	global g_verbose
-	g_verbose = verbose
-	# if (g_file is None):
-	# 	g_file = open(file_name, mode='w+')
+    global g_file
+    global g_verbose
+    g_verbose = verbose
+    if g_verbose == False:
+        try:
+            g_file = open(file_name, mode='w+')
+        except:
+            print('p_dbg_init open {} [fail]'.format(file_name))
+            sys.exit(1)
 
-	# 	if (g_verbose == True):
-	# 		print("Create a new log file: ".format(g_file))
-	# 	else:
-	# 		g_file.write("Create a new log file: {}\n".format(file_name))
+        g_file.write("Create a new log file: {}\n".format(file_name))
+    else:
+        print("Create a new log file: {}".format(file_name))
 
 def p_dbg(dbglevel, text):
     global g_file

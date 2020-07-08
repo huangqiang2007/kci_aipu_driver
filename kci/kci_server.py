@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
+
+#-------------------------------------------------------------------------------
+# This file is CONFIDENTIAL and any use by you is subject to the terms of the
+# agreement between you and Arm China or the terms of the agreement between you
+# and the party authorised by Arm China to disclose this file to you.
+# The confidential and proprietary information contained in this file may only
+# be used by a person authorised under and to the extent permitted by a
+# subsisting licensing agreement from Arm China.
 #
-# File name: kci_server.py
+#        (C) Copyright 2020 Arm Technology (China) Co. Ltd.
+#                    All rights reserved.
+#
+# This entire notice must be reproduced on all copies of this file and copies of
+# this file may only be made by a person if such person is permitted to do so
+# under the terms of a subsisting license agreement from Arm China.
+#
+#--------------------------------------------------------------------------------
+
+#
 #
 # Note: this file is the main logic for server, it
-# wait and receive packets coming from client(UI level).
+# wait and receive packets coming from client(Juno).
 # then it's responsible for parsing packets and handle them.
-#
 #
 #
 from threading import Timer, Condition, Thread
@@ -25,17 +41,23 @@ from kci_packet import *
 from kci_misc import *
 from kci_dbg import *
 
-#
-# initial
-#
+# container for received packets
 g_rcv_dic = {}
-#re_rule = re.compile(r'\{.*?\}+')
+
+# TCP socket server
 g_server = None
+
+# log file for the whole test
 g_result_file = './kci_result.txt'
+
+# ResultData object
 g_ResultData_obj = None
+
+# GenLinuxImage object
 g_genLiuxImage_obj = None
 
 
+# Class: wrapper for storing all test log
 class ResultData:
     result_fp = None
 
@@ -60,23 +82,45 @@ class ResultData:
         except:
             LOG_ERR('store_data')
 
+# Class: hanle Linux Image generation for different kernel config
 class GenLiuxImage:
-    tftp_dir = './tftp_root'
+    # tftp server directory
+    tftp_dir = '/media/disk_4t_1/runtime/test_user/tftp_root'
+
+    # the image index in tftp server directory
     tftp_idx = 0
+
+    # all generated Image stored into this folder
     image_dir = 'images/'
+
+    # the current transferred Image name via TFTP
     tftp_cur_image_name = ''
+
+    # store the absolute path for Image files
     image_abs_path = ''
+
+    # the current work directory
     cur_abs_path = ''
+
+    # the absolute path for corss toolchain
     toolchain_path = ''
+
+    # the absolute path for Linux kernel source code
     kernel_path = ''
+
+    # the absolute path for Linux config files
     defconfig_abs_path = ''
+
+    # list all Linux defconfig files' name
     defconfig_list = []
+
+    # list all generated images' name
     image_list = []
 
     # flag: control whether it needs to compile Linux kernel
     compileLinux = False
 
-    # record compile log
+    # object for recording compile log
     resultData_obj = None
 
     def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _compileLinux, _resultData_obj):
@@ -91,6 +135,7 @@ class GenLiuxImage:
         self.cur_abs_path = os.path.abspath('./')
         self.image_abs_path = self.cur_abs_path + '/' + self.image_dir
 
+        # add toolchain path to system 'PATH'
         if os.path.exists(_toolchain_path) == True:
             self.toolchain_path = _toolchain_path
 
@@ -103,6 +148,7 @@ class GenLiuxImage:
             LOG_ERR('GenLiuxImage __init__: _toolchain_path {} invalid'.format(_toolchain_path))
             sys.exit(1)
 
+        # record Linux kernel source path
         if os.path.exists(_kernel_path) == True:
             self._kernel_path = os.path.abspath(_kernel_path)
             LOG_DBG(self._kernel_path)
@@ -110,6 +156,7 @@ class GenLiuxImage:
             LOG_ERR('GenLiuxImage __init__: _kernel_path {} invalid'.format(_kernel_path))
             sys.exit(1)
 
+        # extract defconfig files
         if os.path.exists(_defconfig_path) == True:
             self.defconfig_abs_path = os.path.abspath(_defconfig_path)
             LOG_DBG(self.defconfig_abs_path)
@@ -121,6 +168,7 @@ class GenLiuxImage:
 
         self.compile_linux()
 
+    # compile Linux kernel according to some one defconfig
     def compile_single_linux(self, _defconfig):
         LOG_DBG('compile_single_linux')
         # the commands for compiling Linux kernel
@@ -128,10 +176,10 @@ class GenLiuxImage:
         CMD2 = 'make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean'
         CMD3 = 'cp ' + _defconfig +  ' ' + self._kernel_path + '/.config'
         CMD4 = 'make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j4'
-        # CMD5 = 'cd ' + self.cur_abs_path
 
-        cmd_list = [CMD3, CMD4]
+        cmd_list = [CMD2, CMD3, CMD4]
 
+        # change work directory to kernel source directory
         os.chdir(self._kernel_path)
         for cmd in cmd_list:
             LOG_DBG(cmd)
@@ -142,11 +190,13 @@ class GenLiuxImage:
 
         return 0
 
+    # loop all defconfig and generate Image for every defconfig
     def compile_linux(self):
         LOG_DBG('compile_linux')
 
         # whether compile Linux kernel firstly
         if self.compileLinux == True:
+            # loop all defconfig
             for linux_defconfig in self.defconfig_list:
                 os.chdir(self.cur_abs_path)
                 ret = self.compile_single_linux(self.defconfig_abs_path + '/' + linux_defconfig)
@@ -165,7 +215,7 @@ class GenLiuxImage:
                 if ret < 0:
                     LOG_ERR(CMD + ' [fail]')
 
-        # extract all images to form specific List
+        # extract all images and form specific List
         self.image_list = os.listdir(self.image_abs_path)
         LOG_ALERT(self.image_list)
 
@@ -180,6 +230,8 @@ class GenLiuxImage:
 
         while self.tftp_idx < len(self.image_list):
             self.tftp_cur_image_name = self.image_list[self.tftp_idx]
+
+            # copy one Image to TFTP root directory
             CMD = 'cp ' + self.image_abs_path + '/' +  self.tftp_cur_image_name \
                 + ' ' + os.path.abspath(self.tftp_dir) + '/Image'
 
@@ -203,9 +255,15 @@ class GenLiuxImage:
 # MessageParser handle each connection from client
 #
 class MessageParser:
+    # ResultData object
     resultData_obj = None
+
+    # GenLinuxImage object
     genLiuxImage_obj = None
+
+    # container for sending back packet to Juno
     send_pkt_dic = {}
+
     def __init__(self, request, client_address, _resultData_obj, _genLiuxImage_obj):
         self.request = request
         self.client_address = client_address
@@ -215,6 +273,7 @@ class MessageParser:
         self.genLiuxImage_obj = _genLiuxImage_obj
         LOG_INFO("init MessageParser")
 
+    # wrapper for sending back packet
     def common_send(self, send_dic):
         ret = 0
         try:
@@ -224,6 +283,7 @@ class MessageParser:
             ret = -1
         return ret
 
+    # handle begin packet coming from Juno
     def handle_begin_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
@@ -232,13 +292,20 @@ class MessageParser:
         self.resultData_obj.store_data('\n\nImage Begin: ' + self.send_pkt_dic['imageName'] + '\n')
         return self.common_send(self.send_pkt_dic)
 
+    # handle end packer coming from Juno
     def handle_end_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_END_ACK
+
+        if self.genLiuxImage_obj.tftp_idx < len(self.genLiuxImage_obj.image_list):
+            self.send_pkt_dic['reboot'] = 'reboot'
+        else:
+            self.send_pkt_dic['reboot'] = ''
         # self.resultData_obj.store_data('Image End: ' + rcv_dic['imageName'] + '\n')
         return self.common_send(self.send_pkt_dic)
 
+    # handle file data packet coming from Juno
     def handle_file_pkt(self, rcv_dic):
         self.send_pkt_dic.clear()
         self.send_pkt_dic['id'] = rcv_dic['id']
@@ -259,12 +326,21 @@ class MessageParser:
         else:
             LOG_ERR("handle_rcv_msg packet id: {}, type: {} error".format(rcv_dic['id'], rcv_dic['type']))
 
+    # listen the coming packet from Juno
     def loop_images(self, message_parser):
+        # input file set for select API
         inputs = [self.request]
+
+        # output file set for select API
         outputs = []
+
+        # container for received packet
         rcv_dic = {}
+
+        # flag for socket connection
         connect_lost = False
 
+        # timeout value for select API
         TIMEOUT_1MIN = 60
         TIMEOUT_20MIN = 1200
         timeout = TIMEOUT_1MIN
@@ -275,16 +351,18 @@ class MessageParser:
             sys.exit(0)
 
         while True:
-            LOG_ALERT('before select, timeout {}, {}'.format(timeout, connect_lost))
+            LOG_ALERT('loop_images select, timeout: {}, connect_lost: {}'.format(timeout, connect_lost))
             try:
                 readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
             except:
-                LOG_ERR('\n\nloop_images select: timeout')
+                LOG_ERR('\n\nloop_images select exception: timeout')
                 connect_lost = True
 
+            # select API timeout occurs
             if len(readable) == 0:
                 LOG_ERR('loop_images select: timeout')
                 connect_lost = True
+            # have readable socket
             else:
                 for s in readable:
                     data = s.recv(PKT_LEN_1M)
@@ -326,9 +404,12 @@ class MessageParser:
                         LOG_ERR("loop_images packet id: {}, type: {} error".format(rcv_dic['id'], rcv_dic['type']))
 
             if connect_lost == True:
-                LOG_ALERT('loop_images exit')
+                LOG_ALERT('loop_images [exit]')
                 self.request.close()
                 # self.genLiuxImage_obj.tftp_loop_one_image()
+
+                # clear this critical variable, so that the tcp socket
+                # connection ( see: SockTCPHandler->handle() ) disconnet normally.
                 self.genLiuxImage_obj.tftp_cur_image_name = ''
                 break
 
@@ -435,7 +516,13 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
     def finish(self):
         LOG_ALERT("connect finish req {}\n".format(self.client_address))
         g_server.close_request(self.request)
-        self.message_parser.genLiuxImage_obj.tftp_loop_one_image()
+
+        if self.message_parser.genLiuxImage_obj.tftp_idx >= \
+            len(self.message_parser.genLiuxImage_obj.image_list):
+            LOG_ALERT('loop all image, exit [ok]')
+            sys.exit(0)
+        else:
+            self.message_parser.genLiuxImage_obj.tftp_loop_one_image()
 
 if __name__ == "__main__":
     if os.path.exists(g_result_file) == True:
