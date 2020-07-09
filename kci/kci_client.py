@@ -86,6 +86,8 @@ class MessageSender:
             LOG_ERR("MessageSender close({}, {}) [fail]".format(self.ms_ip, self.ms_port))
             sys.exit(1)
 
+    # - send BEGIN packet to server
+    # - receive ACK packet from server
     def handle_begin_pkt(self):
         self.send_pkt_dic.clear()
         self.recv_pkt_dic.clear()
@@ -100,6 +102,9 @@ class MessageSender:
         self.image_name = self.recv_pkt_dic['imageName']
         LOG_INFO("handle_begin_pkt rcv: " + str(self.recv_pkt_dic))
 
+    # - send END packet to server
+    # - receive ACK packet from server
+    # - if the feedback of server includes 'reboot' command, then reboot Juno
     def handle_end_pkt(self):
         self.send_pkt_dic.clear()
         self.recv_pkt_dic.clear()
@@ -120,6 +125,8 @@ class MessageSender:
             LOG_ALERT('all images test done on Juno, no reboot')
             sys.exit(0)
 
+    # - send AIPU test result to server
+    # - receive ACK packet from server
     def handle_file_pkt(self, file_path):
         self.send_pkt_dic.clear()
         self.recv_pkt_dic.clear()
@@ -163,7 +170,7 @@ if __name__ == "__main__":
     try:
         LOG_ALERT("ip: {}, port: {}".format(IP, PORT))
         g_message_sender_obj = MessageSender(IP, PORT)
-        g_message_sender_obj.test()
+        # g_message_sender_obj.test()
     except Exception:
-        LOG_ERR("client.connect(({}, {}))".format(IP, PORT))
+        LOG_ERR("main client.connect(({}, {})) [fail]".format(IP, PORT))
         sys.exit(1)

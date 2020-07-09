@@ -23,6 +23,14 @@
 # wait and receive packets coming from client(Juno).
 # then it's responsible for parsing packets and handle them.
 #
+# - compile Linux kernel and generate Image according to different defconfig
+# - loop Images one by one via TFTP
+# - wait BEGIN packet from Juno
+# - wait AIPU test result from Juno
+# - wait END packet form Juno
+# - decide to send 'reboot' command to Juno
+# - exit or loop next Image again
+#
 #
 from threading import Timer, Condition, Thread
 import socketserver
