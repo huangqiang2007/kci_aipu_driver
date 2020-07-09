@@ -43,6 +43,9 @@ class KciParseCmdline:
     # Linux deconfig rel/abs path
     defconfig_path = ''
 
+    # Linux image path
+    linux_image_dir = ''
+
     # dicide whether compile Linux kernel firstly, or directly use generated Linux images
     # True: compile Linux firstly
     # False: use generated images directly
@@ -55,12 +58,14 @@ class KciParseCmdline:
 
     def server_help(self):
         print('help:')
-        print('kci_server.py -i ip -p port -t toolchain_path -k kernel_path -f defconfig_path -v -h]')
+        print('kci_server.py -i ip -p port -t toolchain_path -k kernel_path -f defconfig_path -s linuximage_path -c -v -h]')
         print(' -i: ip_address')
         print(' -p: port')
         print(' -t: toolchain path')
         print(' -k: Linux kernel path')
         print(' -f: Linux defconfig path')
+        print(' -s: Linux Image path')
+        print(' -c: compile Linux kernel or not')
         print(' -v: verbose')
         print(' -h: help')
         sys.exit(0)
@@ -70,7 +75,7 @@ class KciParseCmdline:
         parse command line arguments
         '''
         try:
-            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:cv", ["loop=","dbg_lvl="])
+            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:s:cv", ["loop=","dbg_lvl="])
         except getopt.GetoptError:
             LOG_ERR('kci_server.py cmdline args invalid ' + args)
             sys.exit(1)
@@ -93,6 +98,9 @@ class KciParseCmdline:
             elif opt == '-f':
                 self.defconfig_path = arg
                 LOG_DBG("Linux defconfig path: " + self.defconfig_path)
+            elif opt == '-s':
+                self.linux_image_dir = arg
+                LOG_DBG("Linux Image path: " + self.linux_image_dir)
             elif opt == '-c':
                 self.compileLinux = True
                 LOG_DBG("Linux defconfig path: " + self.defconfig_path)
@@ -124,4 +132,8 @@ class KciParseCmdline:
 
         if os.path.exists(self.defconfig_path) == False:
             LOG_ERR('defconfig_path {}: invalid'.format(self.defconfig_path))
+            sys.exit(1)
+
+        if os.path.exists(self.linux_image_dir) == False:
+            LOG_ERR('linux image_path {}: invalid'.format(self.linux_image_dir))
             sys.exit(1)

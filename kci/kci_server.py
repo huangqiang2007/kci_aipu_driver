@@ -125,23 +125,26 @@ class GenLiuxImage:
     # list all generated images' name
     image_list = []
 
+    # the absolute path for Linux Images
+    linux_image_path = []
+
     # flag: control whether it needs to compile Linux kernel
     compileLinux = False
 
     # object for recording compile log
     resultData_obj = None
 
-    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _compileLinux, _resultData_obj):
+    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _linux_image_path, _compileLinux, _resultData_obj):
+        self.linux_image_path = os.path.abspath(_linux_image_path)
         self.compileLinux = _compileLinux
         self.resultData_obj = _resultData_obj
 
-        # if os.path.exists(self.image_dir) == True:
-        #     os.system('rm -fr ' + self.image_dir)
-        if os.path.exists(self.image_dir) == False:
-            os.mkdir(self.image_dir)
+        # if os.path.exists(self.linux_image_path) == True:
+        #     os.system('rm -fr ' + self.linux_image_path + "/*")
+        if os.path.exists(self.linux_image_path) == False:
+            os.mkdir(self.linux_image_path)
 
         self.cur_abs_path = os.path.abspath('./')
-        self.image_abs_path = self.cur_abs_path + '/' + self.image_dir
 
         # add toolchain path to system 'PATH'
         if os.path.exists(_toolchain_path) == True:
@@ -193,7 +196,7 @@ class GenLiuxImage:
             LOG_DBG(cmd)
             ret = os.system(cmd)
             if ret < 0:
-                LOG_ERR(cmd)
+                LOG_ERR('compile_single_linux ' + cmd)
                 return ret
 
         return 0
@@ -216,7 +219,7 @@ class GenLiuxImage:
                     self.resultData_obj.store_data("compile linux: {} [ok]\n".format(linux_defconfig))
 
                 CMD = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
-                    + ' ' + self.image_abs_path + '/' + linux_defconfig + '-Image'
+                    + ' ' + self.linux_image_path + '/' + linux_defconfig + '-Image'
 
                 LOG_INFO(CMD)
                 ret = os.system(CMD)
@@ -224,7 +227,7 @@ class GenLiuxImage:
                     LOG_ERR(CMD + ' [fail]')
 
         # extract all images and form specific List
-        self.image_list = os.listdir(self.image_abs_path)
+        self.image_list = os.listdir(self.linux_image_path)
         LOG_ALERT(self.image_list)
 
     def tftp_loop_one_image(self):
@@ -240,7 +243,7 @@ class GenLiuxImage:
             self.tftp_cur_image_name = self.image_list[self.tftp_idx]
 
             # copy one Image to TFTP root directory
-            CMD = 'cp ' + self.image_abs_path + '/' +  self.tftp_cur_image_name \
+            CMD = 'cp ' + self.linux_image_path + '/' +  self.tftp_cur_image_name \
                 + ' ' + os.path.abspath(self.tftp_dir) + '/Image'
 
             self.tftp_idx += 1
@@ -543,7 +546,7 @@ if __name__ == "__main__":
     p_dbg_init(pc_obj.VERBOSE)
 
     g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, \
-        pc_obj.defconfig_path, pc_obj.compileLinux, g_ResultData_obj)
+        pc_obj.defconfig_path, pc_obj.linux_image_dir, pc_obj.compileLinux, g_ResultData_obj)
     g_genLiuxImage_obj.tftp_loop_one_image()
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
