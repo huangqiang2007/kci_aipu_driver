@@ -534,6 +534,13 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
             sys.exit(0)
         else:
             self.message_parser.genLiuxImage_obj.tftp_loop_one_image()
+            # reboot Juno
+            REBOOT_CMD = "sshpass -p '' ssh root@10.190.0.102 '/sbin/reboot'"
+            if os.system(REBOOT_CMD) < 0:
+                LOG_ERR('reboot Linux [fail]')
+                sys.exit(1)
+            else:
+                LOG_ALERT('reboot Linux [ok]')
 
 if __name__ == "__main__":
     if os.path.exists(g_result_file) == True:
@@ -548,6 +555,13 @@ if __name__ == "__main__":
     g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, \
         pc_obj.defconfig_path, pc_obj.linux_image_dir, pc_obj.compileLinux, g_ResultData_obj)
     g_genLiuxImage_obj.tftp_loop_one_image()
+    # reboot Juno
+    REBOOT_CMD = "sshpass -p '' ssh root@10.190.0.102 '/sbin/reboot'"
+    if os.system(REBOOT_CMD) < 0:
+        LOG_ERR('reboot Linux [fail]')
+        sys.exit(1)
+    else:
+        LOG_ALERT('reboot Linux [ok]')
 
     HOST,PORT = pc_obj.IP, pc_obj.PORT
     LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))

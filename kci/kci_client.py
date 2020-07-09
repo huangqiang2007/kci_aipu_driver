@@ -120,7 +120,7 @@ class MessageSender:
         LOG_INFO("handle_end_pkt rcv: " + str(self.recv_pkt_dic))
         if self.recv_pkt_dic['reboot'] == 'reboot':
             LOG_ALERT('reboot Juno now')
-            os.system('reboot')
+            # os.system('reboot')
         else:
             LOG_ALERT('all images test done on Juno, no reboot')
             sys.exit(0)
