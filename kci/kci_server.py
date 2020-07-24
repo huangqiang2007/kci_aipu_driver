@@ -131,11 +131,16 @@ class GenLiuxImage:
     # flag: control whether it needs to compile Linux kernel
     compileLinux = False
 
+    # runtime KMD & UMD source code path
+    runtime_abs_path = ''
+
     # object for recording compile log
     resultData_obj = None
 
-    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path, _linux_image_path, _compileLinux, _resultData_obj):
+    def __init__(self, _toolchain_path, _kernel_path, _defconfig_path,\
+        _linux_image_path, _runtime_path, _compileLinux, _resultData_obj):
         self.linux_image_path = os.path.abspath(_linux_image_path)
+        self.runtime_abs_path = os.path.abspath(_runtime_path)
         self.compileLinux = _compileLinux
         self.resultData_obj = _resultData_obj
 
@@ -210,6 +215,8 @@ class GenLiuxImage:
             # loop all defconfig
             for linux_defconfig in self.defconfig_list:
                 os.chdir(self.cur_abs_path)
+
+                # 1. compile Linux
                 ret = self.compile_single_linux(self.defconfig_abs_path + '/' + linux_defconfig)
                 if ret < 0:
                     LOG_ERR("compile_linux {}".format(linux_defconfig))
@@ -218,13 +225,39 @@ class GenLiuxImage:
                 else:
                     self.resultData_obj.store_data("compile linux: {} [ok]\n".format(linux_defconfig))
 
-                CMD = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
-                    + ' ' + self.linux_image_path + '/' + linux_defconfig + '-Image'
+                # 2. compile KMD and UMD
+                tmp_runtime_path = self.runtime_abs_path + '/AIPU_runtime_validation/linux/api_use_scene_test/'
+                os.chdir(tmp_runtime_path)
+                CMD1 = './build_all.sh juno-linux-4.9 -d'
+                CMD2 = 'tar czf build.tgz build'
+                cmd_list = [CMD1, CMD2]
 
-                LOG_INFO(CMD)
-                ret = os.system(CMD)
-                if ret < 0:
-                    LOG_ERR(CMD + ' [fail]')
+                for cmd in cmd_list:
+                    LOG_INFO(cmd)
+                    ret = os.system(cmd)
+                    if ret < 0:
+                        LOG_ERR(cmd + ' [fail]')
+                        continue
+
+                # change dir to current path
+                os.chdir(self.cur_abs_path)
+
+                # 3. copy Linux Image and Runtime library to destination
+                tmp_image_path = self.linux_image_path + '/' + linux_defconfig
+                os.mkdir(tmp_image_path)
+
+                CMD1 = 'cp ' + self._kernel_path + '/arch/arm64/boot/Image' \
+                    + ' ' + tmp_image_path
+                CMD2 = 'cp ' + tmp_runtime_path + '/build.tgz' + ' ' + tmp_image_path
+                cmd_list = [CMD1, CMD2]
+
+                for cmd in cmd_list:
+                    LOG_INFO(cmd)
+                    ret = os.system(cmd)
+                    if ret < 0:
+                        LOG_ERR(cmd + ' [fail]')
+                        os.system('rm -fr ' + tmp_image_path)
+                        continue
 
         # extract all images and form specific List
         self.image_list = os.listdir(self.linux_image_path)
@@ -243,8 +276,8 @@ class GenLiuxImage:
             self.tftp_cur_image_name = self.image_list[self.tftp_idx]
 
             # copy one Image to TFTP root directory
-            CMD = 'cp ' + self.linux_image_path + '/' +  self.tftp_cur_image_name \
-                + ' ' + os.path.abspath(self.tftp_dir) + '/Image'
+            CMD = 'cp ' + self.linux_image_path + '/' +  self.tftp_cur_image_name + '/*' \
+                + ' ' + os.path.abspath(self.tftp_dir)
 
             self.tftp_idx += 1
             LOG_INFO('tftp_loop_one_image: ' + CMD)
@@ -553,8 +586,11 @@ if __name__ == "__main__":
     p_dbg_init(pc_obj.VERBOSE)
 
     g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, \
-        pc_obj.defconfig_path, pc_obj.linux_image_dir, pc_obj.compileLinux, g_ResultData_obj)
+        pc_obj.defconfig_path, pc_obj.linux_image_dir, pc_obj.runtime_path, \
+        pc_obj.compileLinux, g_ResultData_obj)
+
     g_genLiuxImage_obj.tftp_loop_one_image()
+
     # reboot Juno
     REBOOT_CMD = "sshpass -p '' ssh root@10.190.0.102 '/sbin/reboot'"
     if os.system(REBOOT_CMD) < 0:

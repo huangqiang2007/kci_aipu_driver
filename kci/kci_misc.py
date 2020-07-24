@@ -51,6 +51,10 @@ class KciParseCmdline:
     # False: use generated images directly
     compileLinux = False
 
+    # the runtime path for KMD and UMD source code,
+    # this is for recompile aipu.ko according to different Linux kernel
+    runtime_path = ''
+
     # test log ouput control
     # True: directly output to current terminal
     # False: output log to log file
@@ -58,7 +62,7 @@ class KciParseCmdline:
 
     def server_help(self):
         print('help:')
-        print('kci_server.py -i ip -p port -t toolchain_path -k kernel_path -f defconfig_path -s linuximage_path -c -v -h]')
+        print('kci_server.py -i ip -p port -t toolchain_path -k kernel_path -f defconfig_path -s linuximage_path -c -r runtime_path -v -h]')
         print(' -i: ip_address')
         print(' -p: port')
         print(' -t: toolchain path')
@@ -66,6 +70,7 @@ class KciParseCmdline:
         print(' -f: Linux defconfig path')
         print(' -s: Linux Image path')
         print(' -c: compile Linux kernel or not')
+        print(' -r: runtime KMD&UMD path')
         print(' -v: verbose')
         print(' -h: help')
         sys.exit(0)
@@ -75,7 +80,7 @@ class KciParseCmdline:
         parse command line arguments
         '''
         try:
-            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:s:cv", ["loop=","dbg_lvl="])
+            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:s:r:cv", ["loop=","dbg_lvl="])
         except getopt.GetoptError:
             LOG_ERR('kci_server.py cmdline args invalid ' + args)
             sys.exit(1)
@@ -104,6 +109,9 @@ class KciParseCmdline:
             elif opt == '-c':
                 self.compileLinux = True
                 LOG_DBG("Linux defconfig path: " + self.defconfig_path)
+            elif opt == '-r':
+                self.runtime_path = arg
+                LOG_DBG("Runtime KMD&UMD path: " + self.runtime_path)
             elif opt == '-v':
                 self.VERBOSE = True
 
@@ -136,4 +144,8 @@ class KciParseCmdline:
 
         if os.path.exists(self.linux_image_dir) == False:
             LOG_ERR('linux image_path {}: invalid'.format(self.linux_image_dir))
+            sys.exit(1)
+
+        if os.path.exists(self.runtime_path) == False:
+            LOG_ERR('runtime path {}: invalid'.format(self.runtime_path))
             sys.exit(1)
