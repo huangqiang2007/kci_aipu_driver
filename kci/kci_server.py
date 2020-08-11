@@ -93,7 +93,8 @@ class ResultData:
 # Class: hanle Linux Image generation for different kernel config
 class GenLiuxImage:
     # tftp server directory
-    tftp_dir = '/media/disk_4t_1/runtime/test_user/tftp_root'
+    # '/media/disk_4t_1/runtime/test_user/tftp_root'
+    tftp_dir = ''
 
     # the image index in tftp server directory
     tftp_idx = 0
@@ -138,9 +139,10 @@ class GenLiuxImage:
     resultData_obj = None
 
     def __init__(self, _toolchain_path, _kernel_path, _defconfig_path,\
-        _linux_image_path, _runtime_path, _compileLinux, _resultData_obj):
+        _linux_image_path, _runtime_path, _tftp_dir, _compileLinux, _resultData_obj):
         self.linux_image_path = os.path.abspath(_linux_image_path)
         self.runtime_abs_path = os.path.abspath(_runtime_path)
+        self.tftp_dir = os.path.abspath(_tftp_dir)
         self.compileLinux = _compileLinux
         self.resultData_obj = _resultData_obj
 
@@ -587,7 +589,7 @@ if __name__ == "__main__":
 
     g_genLiuxImage_obj = GenLiuxImage(pc_obj.toolchain_path, pc_obj.kernel_path, \
         pc_obj.defconfig_path, pc_obj.linux_image_dir, pc_obj.runtime_path, \
-        pc_obj.compileLinux, g_ResultData_obj)
+        pc_obj.tftp_dir, pc_obj.compileLinux, g_ResultData_obj)
 
     g_genLiuxImage_obj.tftp_loop_one_image()
 

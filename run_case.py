@@ -60,7 +60,7 @@ class ParseBenchmark:
 		if _batch == False:
 			# one benchmark has one bin group
 			for benchName in self.benchmark_name_list:
-				binGroup_list = self.findBenchmarkBinGroup(_benchPath + "/" + benchName)
+				binGroup_list = self.find_benchmark_bin_group(_benchPath + "/" + benchName)
 				dbg_log(EM_DBG, benchName + ":")
 				dbg_log(EM_DBG, binGroup_list)
 				self.benchmark_data_dic[benchName] = binGroup_list
@@ -68,7 +68,7 @@ class ParseBenchmark:
 		else:
 			# one benchmark has multiple bin group
 			for benchName in self.benchmark_name_list:
-				binGroup_list = self.findBenchmarkBatchBinGroup(_benchPath + "/" + benchName)
+				binGroup_list = self.find_benchmark_batch_bin_group(_benchPath + "/" + benchName)
 				dbg_log(EM_DBG, benchName + ":")
 				dbg_log(EM_DBG, binGroup_list)
 				self.benchmark_data_dic[benchName] = binGroup_list
@@ -76,7 +76,7 @@ class ParseBenchmark:
 
 		dbg_log(EM_DBG, self.benchmark_data_dic)
 
-	def findBenchmarkBinGroup(self, _benchmark_name):
+	def find_benchmark_bin_group(self, _benchmark_name):
 		'''
 		find aipu.bin, input.bin and output.bin
 		@ _benchmark_name: benchmark case name
@@ -129,7 +129,7 @@ class ParseBenchmark:
 		#dbg_log(EM_INFO, binGroup_list)
 		return singleBinGroup_list
 
-	def findBenchmarkBatchBinGroup(self, _benchmark_name):
+	def find_benchmark_batch_bin_group(self, _benchmark_name):
 		'''
 		find aipu.bin, input.bin and output.bin for every batch
 		@ _benchmark_name: benchmark case path

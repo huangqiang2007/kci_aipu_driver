@@ -46,6 +46,8 @@ class KciParseCmdline:
     # Linux image path
     linux_image_dir = ''
 
+    tftp_dir = ''
+
     # dicide whether compile Linux kernel firstly, or directly use generated Linux images
     # True: compile Linux firstly
     # False: use generated images directly
@@ -62,13 +64,16 @@ class KciParseCmdline:
 
     def server_help(self):
         print('help:')
-        print('kci_server.py -i ip -p port -t toolchain_path -k kernel_path -f defconfig_path -s linuximage_path -c -r runtime_path -v -h]')
+        print('kci_server.py -i ip -p port -t toolchain_path \
+            -k kernel_path -f defconfig_path -s linuximage_path \
+            --tftp TFTP_DIR -c -r runtime_path -v -h]')
         print(' -i: ip_address')
         print(' -p: port')
         print(' -t: toolchain path')
         print(' -k: Linux kernel path')
         print(' -f: Linux defconfig path')
         print(' -s: Linux Image path')
+        print(' --tftp: TFTP server directory')
         print(' -c: compile Linux kernel or not')
         print(' -r: runtime KMD&UMD path')
         print(' -v: verbose')
@@ -80,7 +85,7 @@ class KciParseCmdline:
         parse command line arguments
         '''
         try:
-            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:s:r:cv", ["loop=","dbg_lvl="])
+            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:s:r:cv", ["loop=","dbg_lvl=","tftp="])
         except getopt.GetoptError:
             LOG_ERR('kci_server.py cmdline args invalid ' + args)
             sys.exit(1)
@@ -106,6 +111,9 @@ class KciParseCmdline:
             elif opt == '-s':
                 self.linux_image_dir = arg
                 LOG_DBG("Linux Image path: " + self.linux_image_dir)
+            elif opt in ('--tftp'):
+                self.tftp_dir = arg
+                LOG_DBG("TFTP Server path: " + self.tftp_dir)
             elif opt == '-c':
                 self.compileLinux = True
                 LOG_DBG("Linux defconfig path: " + self.defconfig_path)
@@ -140,6 +148,10 @@ class KciParseCmdline:
 
         if os.path.exists(self.defconfig_path) == False:
             LOG_ERR('defconfig_path {}: invalid'.format(self.defconfig_path))
+            sys.exit(1)
+
+        if os.path.exists(self.tftp_dir) == False:
+            LOG_ERR('TFTP Server path {}: invalid'.format(self.tftp_dir))
             sys.exit(1)
 
         if os.path.exists(self.linux_image_dir) == False:
