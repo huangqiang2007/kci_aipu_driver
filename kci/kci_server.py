@@ -566,6 +566,7 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         if self.message_parser.genLiuxImage_obj.tftp_idx >= \
             len(self.message_parser.genLiuxImage_obj.image_list):
             LOG_ALERT('loop all image, exit [ok]')
+            g_server.shutdown()
             sys.exit(0)
         else:
             self.message_parser.genLiuxImage_obj.tftp_loop_one_image()

@@ -27,7 +27,7 @@ IMAGE_PATH=./images/
 RUNTIME_VALIDATION_PATH=/media/disk_4t_1/runtime/test_user/qiahua/workspace/umd_test/runtime_for_juno
 
 # Note:
-# the TFTP server directory which must match with 'TFTP_DIRECTORY' 
+# the TFTP server directory which must match with 'TFTP_DIRECTORY'
 # in /etc/default/tftpd-hpa
 TFTP_DIR=/media/disk_4t_1/runtime/test_user/tftp_root
 
@@ -45,35 +45,35 @@ function ftp_put_file()
 		exit 1
 	fi
 
-	# # ftp operation
-	# ftp -niv <<- EOF
-	# open 10.193.9.64
-	# user aiftp01 Aio426#!
-	# ascii
-	# put $FILE
-	# bye
-	# EOF
-	ftpput -u $USER -p $PSWD $FTP_SERVER $FILE
+	# ftp operation
+	ftp -niv <<- EOF
+	open 10.193.9.64
+	user aiftp01 Aio426#!
+	binary
+	put $FILE
+	bye
+	EOF
+	# ftpput -u $USER -p $PSWD $FTP_SERVER $FILE
 
 	if [ $? -ne 0 ]; then
 		echo "ftp put $FILE [fail]"
 		exit 1
 	else
 		echo "ftp put $FILE [ok]"
-	fi  
+	fi
 }
 
 function ftp_get_file()
 {
-	# # ftp operation
-	# ftp -niv <<- EOF
-	# open 10.193.9.64
-	# user aiftp01 Aio426#!
-	# ascii
-	# get $FILE
-	# bye
-	# EOF
-	ftpget -u $USER -p $PSWD $FTP_SERVER $FILE
+	# ftp operation
+	ftp -niv <<- EOF
+	open 10.193.9.64
+	user aiftp01 Aio426#!
+	ascii
+	get $FILE
+	bye
+	EOF
+	# ftpget -u $USER -p $PSWD $FTP_SERVER $FILE
 
     if [ $? -ne 0 ]; then
         echo "ftp get $FILE [fail]"
@@ -94,6 +94,11 @@ function help()
 
 function kci_test()
 {
+	if [ -n "$COMPILE_LINUX_FLAG" ]; then
+		mkdir -p $IMAGE_PATH
+		rm -fr ${IMAGE_PATH}/*
+	fi
+
     ./kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
         -t $TOOLCHAIN_PATH \
         -f $LINUX_DEFCONFIG_PATH \
@@ -102,7 +107,7 @@ function kci_test()
         -r $RUNTIME_VALIDATION_PATH \
         --tftp $TFTP_DIR \
         $COMPILE_LINUX_FLAG -v
-	
+
 	if [ $? -eq 0 ]; then
 		ftp_put_file
 	else
@@ -111,7 +116,7 @@ function kci_test()
 	fi
 }
 
-ARGS=`getopt -o hc --long tftp: -n 'kci_server.sh' -- "$@"` 
+ARGS=`getopt -o hc --long tftp: -n 'kci_server.sh' -- "$@"`
 eval set -- "$ARGS"
 
 while [ -n "$1" ]
@@ -119,7 +124,7 @@ do
     case "$1" in
     -h|--help)
         help
-		exit 0		
+		exit 0
         ;;
     -c)
         COMPILE_LINUX_FLAG=-c
