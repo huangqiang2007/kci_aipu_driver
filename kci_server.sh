@@ -13,18 +13,27 @@ SERVER_PORT=19998
 # cross compile toolchain path
 TOOLCHAIN_PATH=/media/disk_4t_1/runtime/test_user/qiahua/toolchain/gcc-linaro-6.2.1-2016.11-x86_64_aarch64-linux-gnu/bin/
 
+# current work directory
+PWD_DIR=`pwd`
+
+# current top directory
+TOP_DIR=${PWD_DIR}
+
 # the directory to store Linux defconfig files
-LINUX_DEFCONFIG_PATH=./linux_defconfig/
+LINUX_DEFCONFIG_PATH=$TOP_DIR/linux_defconfig/
 
 # the source code directory of Linux kernel being tested
-LINUX_KERNEL_PATH=/media/disk_4t_1/runtime/test_user/qiahua/workspace/kernel_src/linux-android-4.9.51/
+LINUX_KERNEL_PATH=$TOP_DIR/source_code/linux_version/linux-android-4.9.51/
 
 # the directory to store Linux Images and AIPU runtime library and test APPs
-IMAGE_PATH=./images/
+IMAGE_PATH=$TOP_DIR/images/
 
 # AIPU_runtime_validation source path, it depends on AIPU_runtime_design
 # put both to the same directory
-RUNTIME_VALIDATION_PATH=/media/disk_4t_1/runtime/test_user/qiahua/workspace/umd_test/runtime_for_juno
+RUNTIME_VALIDATION_PATH=$TOP_DIR/source_code/runtime_version/
+
+# KMD build.sh
+KMD_BUILD_SH=$RUNTIME_VALIDATION_PATH/AIPU_runtime_design/Linux/driver/kmd/build.sh
 
 # Note:
 # the TFTP server directory which must match with 'TFTP_DIRECTORY'
@@ -36,7 +45,7 @@ TFTP_DIR=/media/disk_4t_1/runtime/test_user/tftp_root
 COMPILE_LINUX_FLAG=
 
 # KCI test result file
-FILE=kci_result.txt
+FILE=$TOP_DIR/kci_result.txt
 
 function ftp_put_file()
 {
@@ -94,16 +103,39 @@ function help()
 
 function kci_test()
 {
+    # if it needs recompiling Linux, clean up old images.
 	if [ -n "$COMPILE_LINUX_FLAG" ]; then
 		mkdir -p $IMAGE_PATH
 		rm -fr ${IMAGE_PATH}/*
 	fi
 
-    ./kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
+    # replase Linux source code path for compiling new Images
+    if [ -e $LINUX_KERNEL_PATH -a -e $KMD_BUILD_SH ]; then
+        LINUX_DIR_LINE="kdir=$LINUX_KERNEL_PATH"
+        MODIFY_LINUX_DIR=$(echo $LINUX_DIR_LINE | sed 's/\//\\\//g')
+        # echo "LINUX_DIR: "$LINUX_DIR_LINE
+        # echo "KMD build: "$KMD_BUILD_SH
+        # echo "LINUX_DIR_LINE: "$MODIFY_LINUX_DIR
+        sed -i "1,/.*kdir.*/{s/.*kdir.*/$MODIFY_LINUX_DIR/}" $KMD_BUILD_SH
+    else
+        echo "$LINUX_KERNEL_PATH [not exist]"
+        echo "$KMD_BUILD_SH [not exist]"
+        exit 1
+    fi
+
+    # ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
+    #     -t $TOOLCHAIN_PATH \
+    #     -f $LINUX_DEFCONFIG_PATH \
+    #     -k $LINUX_KERNEL_PATH \
+    #     -s $IMAGE_PATH \
+    #     -r $RUNTIME_VALIDATION_PATH \
+    #     --tftp $TFTP_DIR \
+    #     $COMPILE_LINUX_FLAG -v
+
+    ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
         -t $TOOLCHAIN_PATH \
-        -f $LINUX_DEFCONFIG_PATH \
-        -k $LINUX_KERNEL_PATH \
-        -s $IMAGE_PATH \
+        -p juno \
+        -k linux_version_name \
         -r $RUNTIME_VALIDATION_PATH \
         --tftp $TFTP_DIR \
         $COMPILE_LINUX_FLAG -v
