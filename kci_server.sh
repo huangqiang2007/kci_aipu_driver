@@ -134,8 +134,9 @@ function kci_test()
 
     ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
         -t $TOOLCHAIN_PATH \
-        -p juno \
+        -b juno \
         -k linux_version_name \
+        -f linux_defconfig_name \
         -r $RUNTIME_VALIDATION_PATH \
         --tftp $TFTP_DIR \
         $COMPILE_LINUX_FLAG -v

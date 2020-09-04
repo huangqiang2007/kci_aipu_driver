@@ -37,11 +37,14 @@ class KciParseCmdline:
     # specified toolchain absolute path
     toolchain_path = ''
 
+    # HW board name
+    hwboard = ''
+
     # Linux kernle srouce absolute path
-    kernel_path = ''
+    kernel_name = ''
 
     # Linux deconfig rel/abs path
-    defconfig_path = ''
+    defconfig_name = ''
 
     # Linux image path
     linux_image_dir = ''
@@ -65,14 +68,14 @@ class KciParseCmdline:
     def server_help(self):
         print('help:')
         print('kci_server.py -i ip -p port -t toolchain_path \
-            -k kernel_path -f defconfig_path -s linuximage_path \
+            -b board_platform -k linux_path -f linux_config \
             --tftp TFTP_DIR -c -r runtime_path -v -h]')
         print(' -i: ip_address')
         print(' -p: port')
         print(' -t: toolchain path')
-        print(' -k: Linux kernel path')
-        print(' -f: Linux defconfig path')
-        print(' -s: Linux Image path')
+        print(' -b: hw platform [juno, 6cg]')
+        print(' -k: Linux kernel version name')
+        print(' -f: Linux defconfig name')
         print(' --tftp: TFTP server directory')
         print(' -c: compile Linux kernel or not')
         print(' -r: runtime KMD&UMD path')
@@ -85,7 +88,7 @@ class KciParseCmdline:
         parse command line arguments
         '''
         try:
-            opts, args = getopt.getopt(_argv, "hi:p:t:k:f:s:r:cv", ["loop=","dbg_lvl=","tftp="])
+            opts, args = getopt.getopt(_argv, "hi:p:t:b:k:f:r:cv", ["loop=","dbg_lvl=","tftp="])
         except getopt.GetoptError:
             LOG_ERR('kci_server.py cmdline args invalid ' + args)
             sys.exit(1)
@@ -102,21 +105,21 @@ class KciParseCmdline:
             elif opt == '-t':
                 self.toolchain_path = arg
                 LOG_DBG("toolchain path: " + self.toolchain_path)
+            elif opt == '-b':
+                self.hwboard = arg
+                LOG_DBG("toolchain path: " + self.toolchain_path)
             elif opt == '-k':
-                self.kernel_path = arg
-                LOG_DBG("Linux kernel path: " + self.kernel_path)
+                self.kernel_name = arg
+                LOG_DBG("Linux kernel name: " + self.kernel_name)
             elif opt == '-f':
-                self.defconfig_path = arg
-                LOG_DBG("Linux defconfig path: " + self.defconfig_path)
-            elif opt == '-s':
-                self.linux_image_dir = arg
-                LOG_DBG("Linux Image path: " + self.linux_image_dir)
+                self.defconfig_name = arg
+                LOG_DBG("Linux defconfig name: " + self.defconfig_name)
             elif opt in ('--tftp'):
                 self.tftp_dir = arg
                 LOG_DBG("TFTP Server path: " + self.tftp_dir)
             elif opt == '-c':
                 self.compileLinux = True
-                LOG_DBG("Linux defconfig path: " + self.defconfig_path)
+                LOG_DBG("Linux defconfig path: " + self.defconfig_name)
             elif opt == '-r':
                 self.runtime_path = arg
                 LOG_DBG("Runtime KMD&UMD path: " + self.runtime_path)
@@ -142,20 +145,16 @@ class KciParseCmdline:
             LOG_ERR('toolchain_path {}: invalid'.format(self.toolchain_path))
             sys.exit(1)
 
-        if os.path.exists(self.kernel_path) == False:
-            LOG_ERR('kernel_path {}: invalid'.format(self.kernel_path))
-            sys.exit(1)
+        # if os.path.exists(self.kernel_name) == False:
+        #     LOG_ERR('kernel_name {}: invalid'.format(self.kernel_name))
+        #     sys.exit(1)
 
-        if os.path.exists(self.defconfig_path) == False:
-            LOG_ERR('defconfig_path {}: invalid'.format(self.defconfig_path))
-            sys.exit(1)
+        # if os.path.exists(self.defconfig_name) == False:
+        #     LOG_ERR('defconfig_name {}: invalid'.format(self.defconfig_name))
+        #     sys.exit(1)
 
         if os.path.exists(self.tftp_dir) == False:
             LOG_ERR('TFTP Server path {}: invalid'.format(self.tftp_dir))
-            sys.exit(1)
-
-        if os.path.exists(self.linux_image_dir) == False:
-            LOG_ERR('linux image_path {}: invalid'.format(self.linux_image_dir))
             sys.exit(1)
 
         if os.path.exists(self.runtime_path) == False:
