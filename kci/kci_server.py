@@ -93,7 +93,40 @@ class ResultData:
 # Class: hanle Linux Image generation for different kernel config
 class GenLiuxImage:
     # the collection for all information
+    #
+    # define for genLinuxImage_dic
+    # struct genLinuxImage_dic {
+    #     'kci_top_dir':
+    #     'kci_toolchain':
+    #     'kci_board':
+    #     'kci_linux_list': ['linux-1', 'linux-2']
+    #     'kci_runtime_dir':
+    #     'kci_tftp_dir':
+    #     'kci_compile':
+    #     'kci_linux_list'[0]: {
+    #         'linux_path':
+    #         'linux_images':
+    #         'linux_defconfig_path':
+    #         'linux_defconfig_list':
+    #     }
+    #     'kci_linux_list'[1]: {
+    #         'linux_path':
+    #         'linux_images':
+    #         'linux_defconfig_path':
+    #         'linux_defconfig_list':
+    #     }
+    #     'kci_gen_images_list':[['linux-def1', 'linux-def1_image_path'], [], []...]
+    # }
     genLinuxImage_dic = {}
+
+    # the index for genLinuxImage_dic['kci_gen_images_list']
+    tftp_idx = 0
+
+    # linux version name
+    linux_version = ''
+
+    # linux defconfig file name
+    linux_config = ''
 
     # object for recording compile log
     resultData_obj = None
@@ -101,6 +134,7 @@ class GenLiuxImage:
     def __init__(self, _toolchain_path, _platform, _linux_version,\
         _linux_config, _runtime_path, _tftp_dir, _compileLinux, _resultData_obj):
         curcwd = os.path.abspath(".")
+        self.genLinuxImage_dic['kci_gen_images_list'] = []
         self.genLinuxImage_dic['kci_toolchain'] = os.path.abspath(_toolchain_path)
         self.genLinuxImage_dic['kci_board'] = _platform
         self.genLinuxImage_dic['kci_top_dir'] = curcwd
@@ -108,6 +142,9 @@ class GenLiuxImage:
         self.genLinuxImage_dic['kci_runtime_dir'] = os.path.abspath(_runtime_path)
         self.genLinuxImage_dic['kci_tftp_dir'] = os.path.abspath(_tftp_dir)
         self.genLinuxImage_dic['kci_compile'] = _compileLinux
+
+        self.linux_version = _linux_version
+        self.linux_config = _linux_config
         self.resultData_obj = _resultData_obj
 
         self.genLinuxImage_dic['kci_linux_list'] = os.listdir(curcwd + "/" + _platform)
@@ -128,6 +165,11 @@ class GenLiuxImage:
             LOG_DBG(self.genLinuxImage_dic[linux_version]['linux_images'])
             LOG_DBG(self.genLinuxImage_dic[linux_version]['linux_defconfig_list'])
 
+            if self.genLinuxImage_dic['kci_compile'] == True:
+                if(os.system('rm -fr ' + self.genLinuxImage_dic[linux_version]['linux_images'] + '/*') < 0):
+                    LOG_ERR('rm -fr ' + self.genLinuxImage_dic[linux_version]['linux_images'] + '/*' + ' [failed]')
+                    sys.exit(1)
+
         self.compile_linux()
 
     # compile Linux kernel according to some one defconfig
@@ -137,12 +179,12 @@ class GenLiuxImage:
         linux_path = self.genLinuxImage_dic[_linux_version]['linux_path']
         linux_defconfig = self.genLinuxImage_dic[_linux_version]['linux_defconfig_path'] \
             + '/' + _linux_defconfig
+
         # the commands for compiling Linux kernel
         # CMD1 = 'cd ' + self._kernel_path
         CMD2 = 'make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean'
         CMD3 = 'cp ' + linux_defconfig +  ' ' + linux_path + '/.config'
         CMD4 = 'make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j4'
-
         cmd_list = [CMD2, CMD3, CMD4]
 
         # change work directory to kernel source directory
@@ -160,12 +202,27 @@ class GenLiuxImage:
     def compile_linux(self):
         LOG_DBG('compile_linux')
 
-        # whether compile Linux kernel firstly
-        if self.genLinuxImage_dic["kci_compile"] == True:
-            for linux_version in self.genLinuxImage_dic['kci_linux_list']:
-                for linux_defconfig in self.genLinuxImage_dic[linux_version]['linux_defconfig_list']:
-                    os.chdir(self.genLinuxImage_dic["kci_top_dir"])
-                    LOG_DBG('def: ' + linux_defconfig)
+        tmp_runtime_path = ''
+
+        for linux_version in self.genLinuxImage_dic['kci_linux_list']:
+            for linux_defconfig in self.genLinuxImage_dic[linux_version]['linux_defconfig_list']:
+                os.chdir(self.genLinuxImage_dic["kci_top_dir"])
+                LOG_DBG('def: ' + linux_defconfig)
+
+                # filter image by linux version name
+                if self.linux_version == '':
+                    pass
+                elif self.linux_version != linux_version:
+                    continue
+
+                # filter image by linux defconfig name
+                if self.linux_config == '':
+                    pass
+                elif self.linux_config != linux_defconfig:
+                    continue
+
+                # whether it needs to recompile linux and runtime
+                if self.genLinuxImage_dic["kci_compile"] == True:
                     # 1. compile Linux
                     ret = self.compile_single_linux(linux_version, linux_defconfig)
                     if ret < 0:
@@ -199,12 +256,13 @@ class GenLiuxImage:
                             LOG_ERR(cmd + ' [fail]')
                             continue
 
+                # 3. copy Linux Image and Runtime library to destination
+                tmp_image_path = self.genLinuxImage_dic[linux_version]['linux_images'] \
+                    + '/' + linux_defconfig
+
+                if self.genLinuxImage_dic["kci_compile"] == True:
                     # change dir to current path
                     os.chdir(self.genLinuxImage_dic['kci_top_dir'])
-
-                    # 3. copy Linux Image and Runtime library to destination
-                    tmp_image_path = self.genLinuxImage_dic[linux_version]['linux_images'] \
-                        + '/' + linux_defconfig
 
                     cmd = 'mkdir -p ' + tmp_image_path
                     ret = os.system(cmd)
@@ -225,25 +283,31 @@ class GenLiuxImage:
                             os.system('rm -fr ' + tmp_image_path)
                             continue
 
+                temp_gen_image_list = []
+                temp_gen_image_list.append(linux_defconfig)
+                temp_gen_image_list.append(tmp_image_path)
+
+                self.genLinuxImage_dic['kci_gen_images_list'].append(temp_gen_image_list)
+
         # extract all images and form specific List
         # self.image_list = os.listdir(self.linux_image_path)
         # LOG_ALERT(self.image_list)
 
     def tftp_loop_one_image(self):
-        os.chdir(self.cur_abs_path)
-        LOG_INFO('tftp_loop_one_image cur_path: ' + os.path.abspath(self.tftp_dir))
-        LOG_INFO('tftp_loop_one_image: TFTP-idx: {}, len(image_list): {}'.format(self.tftp_idx, len(self.image_list)))
-        if self.tftp_idx >= len(self.image_list):
+        kci_gen_images_list_len = len(self.genLinuxImage_dic['kci_gen_images_list'])
+        LOG_INFO('tftp_loop_one_image: TFTP-idx: {}, len(image_list): {}'.\
+            format(self.tftp_idx, kci_gen_images_list_len))
+        if self.tftp_idx >= kci_gen_images_list_len:
             LOG_ALERT('tftp_loop_one_image loop end')
             self.tftp_cur_image_name = ''
             sys.exit(0)
 
-        while self.tftp_idx < len(self.image_list):
-            self.tftp_cur_image_name = self.image_list[self.tftp_idx]
+        while self.tftp_idx < kci_gen_images_list_len:
+            self.tftp_cur_image_name = self.genLinuxImage_dic['kci_gen_images_list'][self.tftp_idx][0]
+            self.tftp_cur_image_path = self.genLinuxImage_dic['kci_gen_images_list'][self.tftp_idx][1]
 
             # copy one Image to TFTP root directory
-            CMD = 'cp ' + self.linux_image_path + '/' +  self.tftp_cur_image_name + '/*' \
-                + ' ' + os.path.abspath(self.tftp_dir)
+            CMD = 'cp ' + self.tftp_cur_image_path + '/*' + ' ' + self.genLinuxImage_dic['kci_tftp_dir']
 
             self.tftp_idx += 1
             LOG_INFO('tftp_loop_one_image: ' + CMD)
@@ -308,7 +372,7 @@ class MessageParser:
         self.send_pkt_dic['id'] = rcv_dic['id']
         self.send_pkt_dic['type'] = PT_END_ACK
 
-        if self.genLiuxImage_obj.tftp_idx < len(self.genLiuxImage_obj.image_list):
+        if self.genLiuxImage_obj.tftp_idx < len(self.genLiuxImage_obj.genLinuxImage_dic['kci_gen_images_list']):
             self.send_pkt_dic['reboot'] = 'reboot'
         else:
             self.send_pkt_dic['reboot'] = ''
@@ -528,7 +592,7 @@ class SockTCPHandler(socketserver.BaseRequestHandler):
         g_server.close_request(self.request)
 
         if self.message_parser.genLiuxImage_obj.tftp_idx >= \
-            len(self.message_parser.genLiuxImage_obj.image_list):
+            len(self.message_parser.genLiuxImage_obj.genLinuxImage_dic['kci_gen_images_list']):
             LOG_ALERT('loop all image, exit [ok]')
             g_server.shutdown()
             sys.exit(0)
@@ -556,17 +620,17 @@ if __name__ == "__main__":
         pc_obj.defconfig_name, pc_obj.runtime_path, \
         pc_obj.tftp_dir, pc_obj.compileLinux, g_ResultData_obj)
 
-    # g_genLiuxImage_obj.tftp_loop_one_image()
+    g_genLiuxImage_obj.tftp_loop_one_image()
 
-    # # reboot Juno
-    # REBOOT_CMD = "sshpass -p '' ssh root@10.190.0.102 '/sbin/reboot'"
-    # if os.system(REBOOT_CMD) < 0:
-    #     LOG_ERR('reboot Linux [fail]')
-    #     sys.exit(1)
-    # else:
-    #     LOG_ALERT('reboot Linux [ok]')
+    # reboot Juno
+    REBOOT_CMD = "sshpass -p '' ssh root@10.190.0.102 '/sbin/reboot'"
+    if os.system(REBOOT_CMD) < 0:
+        LOG_ERR('reboot Linux [fail]')
+        sys.exit(1)
+    else:
+        LOG_ALERT('reboot Linux [ok]')
 
-    # HOST,PORT = pc_obj.IP, pc_obj.PORT
-    # LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
-    # g_server = socketserver.ThreadingTCPServer((HOST, PORT), SockTCPHandler)
-    # g_server.serve_forever()
+    HOST,PORT = pc_obj.IP, pc_obj.PORT
+    LOG_ALERT("ip: {}, port: {}".format(HOST, PORT))
+    g_server = socketserver.ThreadingTCPServer((HOST, PORT), SockTCPHandler)
+    g_server.serve_forever()

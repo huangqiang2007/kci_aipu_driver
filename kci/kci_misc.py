@@ -67,9 +67,9 @@ class KciParseCmdline:
 
     def server_help(self):
         print('help:')
-        print('kci_server.py -i ip -p port -t toolchain_path \
+        print("kci_server.py -i ip -p port -t toolchain_path \
             -b board_platform -k linux_path -f linux_config \
-            --tftp TFTP_DIR -c -r runtime_path -v -h]')
+            --tftp TFTP_DIR -c -r runtime_path -v -h")
         print(' -i: ip_address')
         print(' -p: port')
         print(' -t: toolchain path')
@@ -145,13 +145,9 @@ class KciParseCmdline:
             LOG_ERR('toolchain_path {}: invalid'.format(self.toolchain_path))
             sys.exit(1)
 
-        # if os.path.exists(self.kernel_name) == False:
-        #     LOG_ERR('kernel_name {}: invalid'.format(self.kernel_name))
-        #     sys.exit(1)
-
-        # if os.path.exists(self.defconfig_name) == False:
-        #     LOG_ERR('defconfig_name {}: invalid'.format(self.defconfig_name))
-        #     sys.exit(1)
+        if self.kernel_name == '' and self.defconfig_name != '':
+            LOG_ERR('kernel_name null, defconfig {}: invalid'.format(self.defconfig_name))
+            sys.exit(1)
 
         if os.path.exists(self.tftp_dir) == False:
             LOG_ERR('TFTP Server path {}: invalid'.format(self.tftp_dir))
