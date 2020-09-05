@@ -19,21 +19,18 @@ PWD_DIR=`pwd`
 # current top directory
 TOP_DIR=${PWD_DIR}
 
-# the directory to store Linux defconfig files
-LINUX_DEFCONFIG_PATH=$TOP_DIR/linux_defconfig/
+# HW board, (juno, 6cg)
+BOARD=juno
 
-# the source code directory of Linux kernel being tested
-LINUX_KERNEL_PATH=$TOP_DIR/source_code/linux_version/linux-android-4.9.51/
+# linux versions name, optional
+LINUX_VERSION=
 
-# the directory to store Linux Images and AIPU runtime library and test APPs
-IMAGE_PATH=$TOP_DIR/images/
+# linux defconfig file name, optional
+LINUX_DEFCONFIG=
 
 # AIPU_runtime_validation source path, it depends on AIPU_runtime_design
 # put both to the same directory
-RUNTIME_VALIDATION_PATH=$TOP_DIR/source_code/runtime_version/
-
-# KMD build.sh
-KMD_BUILD_SH=$RUNTIME_VALIDATION_PATH/AIPU_runtime_design/Linux/driver/kmd/build.sh
+RUNTIME_VALIDATION_PATH=$TOP_DIR/runtime_version/
 
 # Note:
 # the TFTP server directory which must match with 'TFTP_DIRECTORY'
@@ -45,7 +42,7 @@ TFTP_DIR=/media/disk_4t_1/runtime/test_user/tftp_root
 COMPILE_LINUX_FLAG=
 
 # KCI test result file
-FILE=$TOP_DIR/kci_result.txt
+FILE=kci_result.txt
 
 function ftp_put_file()
 {
@@ -95,7 +92,10 @@ function ftp_get_file()
 function help()
 {
     echo "help:"
-    echo "  ./kci_server.sh [-c] [--tftp path] -h"
+    echo "  ./kci_server.sh -b board -k linux -f linux_defconifg [-c] [--tftp path] -h"
+    echo "  -b: board name (juno, 6cg)"
+    echo "  -k: linux version name, same with linux source folder name"
+    echo "  -f: linux kernel defconfig file name, see juno/xxx/linux_defconfig/"
     echo "  -c: [-c], decide compile Linux or not"
     echo "  --tftp: [--tftp path], specify TFTP server path"
     echo "  -h: this help"
@@ -103,43 +103,31 @@ function help()
 
 function kci_test()
 {
-    # if it needs recompiling Linux, clean up old images.
-	if [ -n "$COMPILE_LINUX_FLAG" ]; then
-		mkdir -p $IMAGE_PATH
-		rm -fr ${IMAGE_PATH}/*
-	fi
-
-    # replase Linux source code path for compiling new Images
-    if [ -e $LINUX_KERNEL_PATH -a -e $KMD_BUILD_SH ]; then
-        LINUX_DIR_LINE="kdir=$LINUX_KERNEL_PATH"
-        MODIFY_LINUX_DIR=$(echo $LINUX_DIR_LINE | sed 's/\//\\\//g')
-        # echo "LINUX_DIR: "$LINUX_DIR_LINE
-        # echo "KMD build: "$KMD_BUILD_SH
-        # echo "LINUX_DIR_LINE: "$MODIFY_LINUX_DIR
-        sed -i "1,/.*kdir.*/{s/.*kdir.*/$MODIFY_LINUX_DIR/}" $KMD_BUILD_SH
+    if [ -z $LINUX_VERSION -a -z $LINUX_DEFCONIFG ]; then
+        ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
+            -t $TOOLCHAIN_PATH \
+            -b $BOARD \
+            -r $RUNTIME_VALIDATION_PATH \
+            --tftp $TFTP_DIR \
+            $COMPILE_LINUX_FLAG -v
+    elif [ -z $LINUX_DEFCONIFG ]; then
+        ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
+            -t $TOOLCHAIN_PATH \
+            -b $BOARD \
+            -k $LINUX_VERSION \
+            -r $RUNTIME_VALIDATION_PATH \
+            --tftp $TFTP_DIR \
+            $COMPILE_LINUX_FLAG -v
     else
-        echo "$LINUX_KERNEL_PATH [not exist]"
-        echo "$KMD_BUILD_SH [not exist]"
-        exit 1
+        ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
+            -t $TOOLCHAIN_PATH \
+            -b $BOARD \
+            -k $LINUX_VERSION \
+            -f $LINUX_DEFCONIFG \
+            -r $RUNTIME_VALIDATION_PATH \
+            --tftp $TFTP_DIR \
+            $COMPILE_LINUX_FLAG -v
     fi
-
-    # ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
-    #     -t $TOOLCHAIN_PATH \
-    #     -f $LINUX_DEFCONFIG_PATH \
-    #     -k $LINUX_KERNEL_PATH \
-    #     -s $IMAGE_PATH \
-    #     -r $RUNTIME_VALIDATION_PATH \
-    #     --tftp $TFTP_DIR \
-    #     $COMPILE_LINUX_FLAG -v
-
-    ./kci_scripts/kci/kci_server.py -i $SERVER_IP -p $SERVER_PORT \
-        -t $TOOLCHAIN_PATH \
-        -b juno \
-        -k linux_version_name \
-        -f linux_defconfig_name \
-        -r $RUNTIME_VALIDATION_PATH \
-        --tftp $TFTP_DIR \
-        $COMPILE_LINUX_FLAG -v
 
 	if [ $? -eq 0 ]; then
 		ftp_put_file
@@ -149,7 +137,7 @@ function kci_test()
 	fi
 }
 
-ARGS=`getopt -o hc --long tftp: -n 'kci_server.sh' -- "$@"`
+ARGS=`getopt -o hb:k:f:c --long tftp: -n 'kci_server.sh' -- "$@"`
 eval set -- "$ARGS"
 
 while [ -n "$1" ]
@@ -158,6 +146,18 @@ do
     -h|--help)
         help
 		exit 0
+        ;;
+    -b)
+        BOARD=$2
+        shift
+        ;;
+    -k)
+        LINUX_VERSION=$2
+        shift
+        ;;
+    -f)
+        LINUX_DEFCONIFG=$2
+        shift
         ;;
     -c)
         COMPILE_LINUX_FLAG=-c

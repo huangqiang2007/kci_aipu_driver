@@ -97,12 +97,12 @@ class GenLiuxImage:
     # define for genLinuxImage_dic
     # struct genLinuxImage_dic {
     #     'kci_top_dir':
-    #     'kci_toolchain':
+    #     'kci_toolchain_dir':
     #     'kci_board':
     #     'kci_linux_list': ['linux-1', 'linux-2']
     #     'kci_runtime_dir':
     #     'kci_tftp_dir':
-    #     'kci_compile':
+    #     'kci_compile': (True, False)
     #     'kci_linux_list'[0]: {
     #         'linux_path':
     #         'linux_images':
@@ -135,7 +135,7 @@ class GenLiuxImage:
         _linux_config, _runtime_path, _tftp_dir, _compileLinux, _resultData_obj):
         curcwd = os.path.abspath(".")
         self.genLinuxImage_dic['kci_gen_images_list'] = []
-        self.genLinuxImage_dic['kci_toolchain'] = os.path.abspath(_toolchain_path)
+        self.genLinuxImage_dic['kci_toolchain_dir'] = os.path.abspath(_toolchain_path)
         self.genLinuxImage_dic['kci_board'] = _platform
         self.genLinuxImage_dic['kci_top_dir'] = curcwd
         LOG_DBG(self.genLinuxImage_dic['kci_top_dir'])
@@ -172,7 +172,11 @@ class GenLiuxImage:
 
         self.compile_linux()
 
+    #
     # compile Linux kernel according to some one defconfig
+    # @_linux_version: linux version name
+    # @_linux_defconfig: linux kernel defconfig name
+    #
     def compile_single_linux(self, _linux_version, _linux_defconfig):
         LOG_DBG('compile_single_linux')
         LOG_DBG(self.genLinuxImage_dic[_linux_version]['linux_defconfig_path'])
@@ -210,12 +214,14 @@ class GenLiuxImage:
                 LOG_DBG('def: ' + linux_defconfig)
 
                 # filter image by linux version name
+                # only test specified linux version
                 if self.linux_version == '':
                     pass
                 elif self.linux_version != linux_version:
                     continue
 
                 # filter image by linux defconfig name
+                # only test specified defconfig belong to specified linux version
                 if self.linux_config == '':
                     pass
                 elif self.linux_config != linux_defconfig:
@@ -240,11 +246,11 @@ class GenLiuxImage:
                     if self.genLinuxImage_dic['kci_board'] == 'juno':
                         CMD1 = './build_all.sh juno-linux-4.9 ' + \
                             self.genLinuxImage_dic[linux_version]['linux_path'] + ' ' + \
-                            self.genLinuxImage_dic['kci_toolchain']
+                            self.genLinuxImage_dic['kci_toolchain_dir']
                     else:
                         CMD1 = './build_all.sh 6cg-linux-4.14 ' + \
                             self.genLinuxImage_dic[linux_version]['linux_path'] + ' ' + \
-                            self.genLinuxImage_dic['kci_toolchain']
+                            self.genLinuxImage_dic['kci_toolchain_dir']
 
                     CMD2 = 'tar czf build.tgz build'
                     cmd_list = [CMD1, CMD2]
@@ -288,10 +294,6 @@ class GenLiuxImage:
                 temp_gen_image_list.append(tmp_image_path)
 
                 self.genLinuxImage_dic['kci_gen_images_list'].append(temp_gen_image_list)
-
-        # extract all images and form specific List
-        # self.image_list = os.listdir(self.linux_image_path)
-        # LOG_ALERT(self.image_list)
 
     def tftp_loop_one_image(self):
         kci_gen_images_list_len = len(self.genLinuxImage_dic['kci_gen_images_list'])
