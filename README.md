@@ -11,28 +11,52 @@ Juno.
 
 server side: there are two choices to boot kci server
 
-
-1.	if it has generated Linux kernel images, just specify kernel image path(-s)
+1.	if there's no Linux kernel image, compile Linux kernel firstly via adding -c parameter
+	this way will compile Linux firstly, then loop and test all images.
 
 	# ./kci/kci_server.py
 		-i 10.190.0.120
 		-p 19998
 		-t /media/disk_4t_1/runtime/test_user/qiahua/toolchain/gcc-linaro-6.2.1-2016.11-x86_64_aarch64-linux-gnu/bin/
-		-f ./test_defconfig
-		-k /media/disk_4t_1/runtime/test_user/qiahua/workspace/kernel_src/linux-android-4.9.51/
-		-s ./images/
+		-b juno
+		-k linux-android-4.9.51
+		-f test_defconfig
+		-c
 		-v
 
-2.	if there's no Linux kernel image(-c), compile Linux kernel firstly
+2.	if it has generated Linux kernel images, just omit -c parameter, there are
+	three ways for referencing.
 
-	# ./kci/kci_server.py
+	2.1.	loop and test all images belong to specific board (-b)
+
+		# ./kci/kci_server.py
+			-i 10.190.0.120
+			-p 19998
+			-t /media/disk_4t_1/runtime/test_user/qiahua/toolchain/gcc-linaro-6.2.1-2016.11-x86_64_aarch64-linux-gnu/bin/
+			-b juno
+			-k linux-android-4.9.51
+			-f test_defconfig
+			-v
+
+	2.2.	loop and test all images belong to specific board (-b) and linux version (-k)
+
+		# ./kci/kci_server.py
+			-i 10.190.0.120
+			-p 19998
+			-t /media/disk_4t_1/runtime/test_user/qiahua/toolchain/gcc-linaro-6.2.1-2016.11-x86_64_aarch64-linux-gnu/bin/
+			-b juno
+			-k linux-android-4.9.51
+			-v
+
+	2.3.	just test one image (-f) belong to specific board (-b) and linux version (-k)
+
+		# ./kci/kci_server.py
 		-i 10.190.0.120
 		-p 19998
 		-t /media/disk_4t_1/runtime/test_user/qiahua/toolchain/gcc-linaro-6.2.1-2016.11-x86_64_aarch64-linux-gnu/bin/
-		-f ./test_defconfig
-		-k /media/disk_4t_1/runtime/test_user/qiahua/workspace/kernel_src/linux-android-4.9.51/
-		-s ./images/
-		-c
+		-b juno
+		-k linux-android-4.9.51
+		-f test_defconfig
 		-v
 
 3.	command line arguments
@@ -40,12 +64,11 @@ server side: there are two choices to boot kci server
 	-i: server IP address
 	-p: server listen port
 	-t: cross compile toolchain directory
-	-f: Linux kernel defconfig directory
-	-k: Linux kernel source code defconfig
-	-s: generated Linux images directory
+	-b: hardware platform name (juno, 6cg)
+	-k: Linux kernel version name
+	-f: Linux kernel defconfig name
 	-c: indicate whether compile Linux or not
 	-v: dump debug log
-
 
 client side: boot kci client on Juno
 

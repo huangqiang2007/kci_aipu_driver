@@ -165,10 +165,19 @@ class GenLiuxImage:
             LOG_DBG(self.genLinuxImage_dic[linux_version]['linux_images'])
             LOG_DBG(self.genLinuxImage_dic[linux_version]['linux_defconfig_list'])
 
+            if(os.system('mkdir -p ' + self.genLinuxImage_dic[linux_version]['linux_images']) < 0):
+                LOG_ERR('mkdir -p ' + self.genLinuxImage_dic[linux_version]['linux_images'] + ' [failed]')
+                sys.exit(1)
+
             if self.genLinuxImage_dic['kci_compile'] == True:
                 if(os.system('rm -fr ' + self.genLinuxImage_dic[linux_version]['linux_images'] + '/*') < 0):
                     LOG_ERR('rm -fr ' + self.genLinuxImage_dic[linux_version]['linux_images'] + '/*' + ' [failed]')
                     sys.exit(1)
+
+            # add toolchain path to system PATH
+            env_path = os.getenv('PATH')
+            os.environ['PATH'] = self.genLinuxImage_dic['kci_toolchain_dir'] + ':' + env_path
+            LOG_INFO(os.getenv('PATH'))
 
         self.compile_linux()
 
@@ -418,7 +427,8 @@ class MessageParser:
 
         # timeout value for select API
         TIMEOUT_1MIN = 60
-        TIMEOUT_20MIN = 1200
+        # TIMEOUT_20MIN = 1200
+        TIMEOUT_20MIN = 4800
         timeout = TIMEOUT_1MIN
 
         # if it has looped all Images, don't loop again
