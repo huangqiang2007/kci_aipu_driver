@@ -271,7 +271,7 @@ class GenLiuxImage:
                             LOG_ERR(cmd + ' [fail]')
                             continue
 
-                # 3. copy Linux Image and Runtime library to destination
+                # 3. copy Linux Image&dtb and Runtime library to destination
                 tmp_image_path = self.genLinuxImage_dic[linux_version]['linux_images'] \
                     + '/' + linux_defconfig
 
@@ -285,10 +285,12 @@ class GenLiuxImage:
                         LOG_ERR(cmd + ' [fail]')
                         sys.exit(1)
 
+                    CMD0 = 'cp ' + self.genLinuxImage_dic[linux_version]['linux_path'] \
+                        + '/arch/arm64/boot/dts/arm/juno-r2.dtb' + ' ' + tmp_image_path
                     CMD1 = 'cp ' + self.genLinuxImage_dic[linux_version]['linux_path'] \
                         + '/arch/arm64/boot/Image' + ' ' + tmp_image_path
                     CMD2 = 'cp ' + tmp_runtime_path + '/build.tgz' + ' ' + tmp_image_path
-                    cmd_list = [CMD1, CMD2]
+                    cmd_list = [CMD0, CMD1, CMD2]
 
                     for cmd in cmd_list:
                         LOG_INFO(cmd)
